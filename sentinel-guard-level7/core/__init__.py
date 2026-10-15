@@ -1,1 +1,0 @@
-"""Sentinel Guard security core."""
