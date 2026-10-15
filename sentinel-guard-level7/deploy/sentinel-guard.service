@@ -1,0 +1,15 @@
+[Unit]
+Description=Sentinel Guard Discord Bot
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=YOUR_LINUX_USER
+WorkingDirectory=/path/to/sentinel-guard
+EnvironmentFile=/path/to/sentinel-guard/.env
+ExecStart=/path/to/sentinel-guard/.venv/bin/python /path/to/sentinel-guard/main.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+[Install]
+WantedBy=multi-user.target
