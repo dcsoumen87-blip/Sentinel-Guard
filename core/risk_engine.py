@@ -1,37 +1,60 @@
-"""Deterministic, explainable risk scoring for defensive event triage.
+"""Security event risk assessment for Sentinel Guard."""
 
-This engine only scores evidence; it never bans or kicks users automatically.
-"""
-from dataclasses import dataclass, field
-from time import monotonic
 from collections import defaultdict, deque
+from time import monotonic
 
-@dataclass
-class RiskResult:
-    score: int
-    level: str
-    reasons: list[str] = field(default_factory=list)
 
 class RiskEngine:
-    def __init__(self, window_seconds: int = 30):
-        self.window_seconds = max(5, min(int(window_seconds), 300))
-        self.events = defaultdict(deque)
+    """Track repeated security events and calculate risk levels."""
 
-    def score(self, guild_id: int, actor_id: int, event: str, *, trusted: bool = False,
-              account_age_days: int | None = None, burst_weight: int = 1) -> RiskResult:
-        if trusted:
-            return RiskResult(0, "TRUSTED", ["trusted exemption"])
+    def __init__(self, window_seconds: int = 10):
+        self.window_seconds = max(1, window_seconds)
+        self._events = defaultdict(deque)
+
+    def record_event(
+        self,
+        guild_id: int,
+        actor_id: int,
+        action: str,
+    ) -> dict:
+        """Record an event and return its risk assessment."""
+
         now = monotonic()
-        key = (int(guild_id), int(actor_id), str(event))
-        q = self.events[key]
-        q.append((now, max(1, min(int(burst_weight), 10))))
-        while q and now - q[0][0] > self.window_seconds:
-            q.popleft()
-        score = min(60, sum(weight * 10 for _, weight in q))
-        reasons = [f"{event} burst: {len(q)} event(s) in {self.window_seconds}s"]
-        if account_age_days is not None and account_age_days < 7:
-            score += 20
-            reasons.append("account younger than 7 days (signal only)")
-        score = min(score, 100)
-        level = "LOW" if score < 20 else "GUARDED" if score < 40 else "HIGH" if score < 70 else "CRITICAL"
-        return RiskResult(score, level, reasons)
+        key = (guild_id, actor_id, action)
+        events = self._events[key]
+
+        while events and now - events[0] > self.window_seconds:
+            events.popleft()
+
+        events.append(now)
+        count = len(events)
+
+        if count >= 6:
+            level = "critical"
+        elif count >= 4:
+            level = "high"
+        elif count >= 2:
+            level = "medium"
+        else:
+            level = "low"
+
+        return {
+            "guild_id": guild_id,
+            "actor_id": actor_id,
+            "action": action,
+            "event_count": count,
+            "risk_level": level,
+            "window_seconds": self.window_seconds,
+        }
+
+    def clear_actor(self, guild_id: int, actor_id: int) -> None:
+        """Clear tracked events for an actor in one server."""
+
+        keys = [
+            key
+            for key in self._events
+            if key[0] == guild_id and key[1] == actor_id
+        ]
+
+        for key in keys:
+            del self._events[key]
