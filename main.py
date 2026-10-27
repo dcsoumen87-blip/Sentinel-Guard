@@ -11,9 +11,21 @@ from database.db import init_db, get_prefix
 from core.whitelist_permissions import init_whitelist_permissions
 
 
+# Application log directory
+LOG_DIR = Path(DATA_DIR) / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# Configure console and file logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            LOG_DIR / "sentinel.log",
+            encoding="utf-8",
+        ),
+    ],
 )
 
 log = logging.getLogger("sentinel_guard")
