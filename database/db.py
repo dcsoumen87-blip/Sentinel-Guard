@@ -6,41 +6,44 @@ import aiosqlite
 from config import DB_PATH, DATA_DIR
 
 
+# Log directory
 LOG_DIR = Path(DATA_DIR) / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-security_logger = logging.getLogger("sentinel.security")
-security_logger.setLevel(logging.INFO)
-security_logger.propagate = False
 
-if not security_logger.handlers:
-    handler = logging.FileHandler(
-        LOG_DIR / "security.log",
-        encoding="utf-8"
-    )
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(message)s"
+def configure_file_logger(name, filename):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    if not any(
+        isinstance(handler, logging.FileHandler)
+        and Path(handler.baseFilename) == (LOG_DIR / filename).resolve()
+        for handler in logger.handlers
+    ):
+        handler = logging.FileHandler(
+            LOG_DIR / filename,
+            encoding="utf-8",
         )
-    )
-    security_logger.addHandler(handler)
-
-
-audit_logger = logging.getLogger("sentinel.audit")
-audit_logger.setLevel(logging.INFO)
-audit_logger.propagate = False
-
-if not audit_logger.handlers:
-    handler = logging.FileHandler(
-        LOG_DIR / "audit.log",
-        encoding="utf-8"
-    )
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(message)s"
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s | %(levelname)s | %(message)s"
+            )
         )
-    )
-    audit_logger.addHandler(handler)
+        logger.addHandler(handler)
+
+    return logger
+
+
+security_logger = configure_file_logger(
+    "sentinel.security",
+    "security.log",
+)
+
+audit_logger = configure_file_logger(
+    "sentinel.audit",
+    "audit.log",
+)
 
 
 SCHEMA = [
@@ -127,7 +130,7 @@ async def get_prefix(guild_id, default="!"):
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "SELECT prefix FROM guild_settings WHERE guild_id = ?",
-            (guild_id,)
+            (guild_id,),
         )
         row = await cursor.fetchone()
 
@@ -143,7 +146,7 @@ async def set_prefix(guild_id, prefix):
             ON CONFLICT(guild_id)
             DO UPDATE SET prefix = excluded.prefix
             """,
-            (guild_id, prefix)
+            (guild_id, prefix),
         )
         await db.commit()
 
@@ -152,7 +155,7 @@ async def get_log_channel(guild_id):
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "SELECT log_channel_id FROM guild_settings WHERE guild_id = ?",
-            (guild_id,)
+            (guild_id,),
         )
         row = await cursor.fetchone()
 
@@ -168,7 +171,7 @@ async def set_log_channel(guild_id, channel_id):
             ON CONFLICT(guild_id)
             DO UPDATE SET log_channel_id = excluded.log_channel_id
             """,
-            (guild_id, channel_id)
+            (guild_id, channel_id),
         )
         await db.commit()
 
@@ -177,11 +180,12 @@ async def add_security_log(
     guild_id,
     action,
     details="",
-    actor_id=None
+    actor_id=None,
 ):
-    safe_details = str(details)[:1500]
-    safe_action = str(action)[:200]
+    safe_action = str(action)[:200].replace("\n", " ")
+    safe_details = str(details)[:1500].replace("\n", " ")
 
+    # Preserve existing SQLite logging.
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
@@ -189,7 +193,7 @@ async def add_security_log(
             (guild_id, action, details, actor_id)
             VALUES (?, ?, ?, ?)
             """,
-            (guild_id, safe_action, safe_details, actor_id)
+            (guild_id, safe_action, safe_details, actor_id),
         )
         await db.commit()
 
@@ -198,7 +202,7 @@ async def add_security_log(
         guild_id,
         safe_action,
         actor_id,
-        safe_details.replace("\n", " ")
+        safe_details,
     )
 
 
@@ -206,12 +210,15 @@ async def add_audit_log(
     guild_id,
     action,
     details="",
-    actor_id=None
+    actor_id=None,
 ):
+    safe_action = str(action)[:200].replace("\n", " ")
+    safe_details = str(details)[:1500].replace("\n", " ")
+
     audit_logger.info(
         "guild_id=%s | action=%s | actor_id=%s | details=%s",
         guild_id,
-        str(action)[:200],
+        safe_action,
         actor_id,
-        str(details)[:1500].replace("\n", " ")
+        safe_details,
     )
