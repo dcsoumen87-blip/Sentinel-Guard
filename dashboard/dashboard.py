@@ -2,6 +2,7 @@ import os
 import hmac
 from pathlib import Path
 from functools import wraps
+from threading import Lock
 
 from flask import (
     Flask,
@@ -11,6 +12,7 @@ from flask import (
     url_for,
     render_template_string,
     abort,
+    jsonify,
 )
 
 app = Flask(__name__)
@@ -18,12 +20,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("DASHBOARD_SECRET", "")
 USERNAME = os.environ.get("DASHBOARD_USER", "")
 PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "")
+LOG_INGEST_TOKEN = os.environ.get("LOG_INGEST_TOKEN", "")
 
-# Render uses PORT; local testing defaults to 8080.
 PORT = int(os.environ.get("PORT", "8080"))
-
-# Log directory can be configured through an environment variable.
 LOG_DIR = Path(os.environ.get("LOG_DIR", "data/logs"))
+
+# Limit incoming request bodies to 64 KB.
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 
 if not app.secret_key or not USERNAME or not PASSWORD:
     raise RuntimeError(
@@ -42,6 +45,15 @@ LOG_FILES = {
     "security.log": "Security Logs",
     "audit.log": "Audit Logs",
 }
+
+INGEST_TYPES = {
+    "application": "sentinel.log",
+    "security": "security.log",
+    "audit": "audit.log",
+}
+
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_LOCK = Lock()
 
 LOGIN_PAGE = """
 <!DOCTYPE html>
@@ -127,7 +139,7 @@ pre {
 </div>
 <p class="status">● Dashboard Online</p>
 <p>Auto-refresh: 10 seconds</p>
-<p>Note: Dashboard status does not confirm the Discord bot is online.</p>
+<p>Dashboard status does not confirm the Discord bot is online.</p>
 </header>
 
 <div class="card">
@@ -191,21 +203,23 @@ def index():
         path = LOG_DIR / filename
 
         try:
-            # Read only the last 200 KB from each log.
             if path.is_file():
                 with path.open("rb") as file:
                     file.seek(0, os.SEEK_END)
                     size = file.tell()
                     file.seek(max(0, size - 200_000))
                     raw = file.read().decode("utf-8", errors="replace")
+
                 lines = raw.splitlines()[-500:]
             else:
-                lines = ["Log file not found on this host."]
+                lines = ["No logs received yet."]
 
             if query:
                 lines = [line for line in lines if query in line.lower()]
 
-            contents[filename] = "\n".join(lines) or "No matching log entries."
+            contents[filename] = (
+                "\n".join(lines) or "No matching log entries."
+            )
 
         except OSError:
             contents[filename] = "Unable to read this log file."
@@ -218,6 +232,78 @@ def index():
     )
 
 
+@app.route("/api/logs", methods=["POST"])
+def ingest_logs():
+    # Fail closed if no ingestion token is configured.
+    if not LOG_INGEST_TOKEN:
+        abort(503)
+
+    auth_header = request.headers.get("Authorization", "")
+    expected_header = f"Bearer {LOG_INGEST_TOKEN}"
+
+    if not hmac.compare_digest(auth_header, expected_header):
+        abort(401)
+
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 415
+
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid JSON object"}), 400
+
+    log_type = payload.get("type")
+    lines = payload.get("lines")
+
+    if log_type not in INGEST_TYPES:
+        return jsonify({"error": "Invalid log type"}), 400
+
+    if not isinstance(lines, list) or not lines or len(lines) > 100:
+        return jsonify({"error": "Expected 1 to 100 log lines"}), 400
+
+    clean_lines = []
+
+    for line in lines:
+        if not isinstance(line, str):
+            return jsonify({"error": "Each log line must be text"}), 400
+
+        # Reject embedded line breaks to prevent forged log entries.
+        if "\n" in line or "\r" in line:
+            return jsonify({"error": "Multiline entries are not allowed"}), 400
+
+        clean_lines.append(line[:2000])
+
+    filename = INGEST_TYPES[log_type]
+    path = LOG_DIR / filename
+
+    try:
+        with LOG_LOCK:
+            with path.open("a", encoding="utf-8") as file:
+                for line in clean_lines:
+                    file.write(line + "\n")
+
+                file.flush()
+
+                # Keep the file bounded to prevent unlimited growth.
+                if path.stat().st_size > 2_000_000:
+                    with path.open("rb") as source:
+                        source.seek(-1_000_000, os.SEEK_END)
+                        retained = source.read()
+
+                    with path.open("wb") as target:
+                        target.write(retained)
+
+    except OSError:
+        app.logger.exception("Unable to save incoming logs")
+        return jsonify({"error": "Unable to save logs"}), 500
+
+    return jsonify({
+        "status": "accepted",
+        "type": log_type,
+        "count": len(clean_lines),
+    }), 200
+
+
 @app.route("/logout")
 def logout():
     session.clear()
@@ -226,8 +312,12 @@ def logout():
 
 @app.route("/health")
 def health():
-    # Only a basic service health check; no secrets or log contents.
     return {"status": "ok"}
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify({"error": "Request too large"}), 413
 
 
 if __name__ == "__main__":
