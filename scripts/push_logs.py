@@ -1,20 +1,23 @@
 import os
 import time
 import json
-import hashlib
 from pathlib import Path
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("/home/ubuntu/app/.env")
 
 LOG_DIR = Path(
     os.getenv("LOG_DIR", "/home/ubuntu/app/data/logs")
 )
 
-RENDER_LOG_URL = os.getenv("RENDER_LOG_URL", "").rstrip("/")
+RENDER_LOG_URL = os.getenv(
+    "RENDER_LOG_URL",
+    "https://sentinel-guard-zjj9.onrender.com/api/logs",
+)
+
 LOG_INGEST_TOKEN = os.getenv("LOG_INGEST_TOKEN", "")
 
 LOG_FILES = {
@@ -24,8 +27,8 @@ LOG_FILES = {
 }
 
 POLL_SECONDS = 10
-MAX_LINES = 100
-MAX_BYTES = 48_000
+MAX_LINES = 50
+MAX_BYTES = 32_000
 
 
 def read_new_lines(path, offset):
@@ -34,7 +37,6 @@ def read_new_lines(path, offset):
 
     size = path.stat().st_size
 
-    # Handle log rotation or truncation.
     if size < offset:
         offset = 0
 
@@ -45,6 +47,7 @@ def read_new_lines(path, offset):
 
     lines = data.decode("utf-8", errors="replace").splitlines()
 
+    # Do not send more lines than the API accepts.
     return lines[-MAX_LINES:], new_offset
 
 
@@ -52,8 +55,8 @@ def send_logs(log_type, lines):
     if not lines:
         return True
 
-    if not RENDER_LOG_URL or not LOG_INGEST_TOKEN:
-        print("Missing RENDER_LOG_URL or LOG_INGEST_TOKEN.")
+    if not LOG_INGEST_TOKEN:
+        print("LOG_INGEST_TOKEN is missing from the environment.")
         return False
 
     payload = json.dumps({
@@ -72,18 +75,29 @@ def send_logs(log_type, lines):
     )
 
     try:
-        with urlopen(request, timeout=15) as response:
-            return 200 <= response.status < 300
-    except (HTTPError, URLError, TimeoutError) as exc:
-        print(f"Log transfer failed ({log_type}): {type(exc).__name__}")
-        return False
+        with urlopen(request, timeout=20) as response:
+            if 200 <= response.status < 300:
+                print(f"Sent {len(lines)} {log_type} log lines.")
+                return True
+
+            print(f"Log transfer failed: HTTP {response.status}")
+            return False
+
+    except HTTPError as exc:
+        print(f"Log transfer failed: HTTP {exc.code}")
+    except (URLError, TimeoutError, OSError) as exc:
+        print(f"Log transfer failed: {type(exc).__name__}")
+
+    return False
 
 
 def main():
-    offsets = {
-        name: 0
-        for name in LOG_FILES
-    }
+    if not LOG_INGEST_TOKEN:
+        raise RuntimeError(
+            "Set LOG_INGEST_TOKEN in /home/ubuntu/app/.env"
+        )
+
+    offsets = {name: 0 for name in LOG_FILES}
 
     print("Sentinel Guard log forwarder started.")
 
