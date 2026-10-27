@@ -1,5 +1,47 @@
+import logging
+from pathlib import Path
+
 import aiosqlite
-from config import DB_PATH
+
+from config import DB_PATH, DATA_DIR
+
+
+LOG_DIR = Path(DATA_DIR) / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+security_logger = logging.getLogger("sentinel.security")
+security_logger.setLevel(logging.INFO)
+security_logger.propagate = False
+
+if not security_logger.handlers:
+    handler = logging.FileHandler(
+        LOG_DIR / "security.log",
+        encoding="utf-8"
+    )
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(message)s"
+        )
+    )
+    security_logger.addHandler(handler)
+
+
+audit_logger = logging.getLogger("sentinel.audit")
+audit_logger.setLevel(logging.INFO)
+audit_logger.propagate = False
+
+if not audit_logger.handlers:
+    handler = logging.FileHandler(
+        LOG_DIR / "audit.log",
+        encoding="utf-8"
+    )
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(message)s"
+        )
+    )
+    audit_logger.addHandler(handler)
+
 
 SCHEMA = [
     """
@@ -137,6 +179,9 @@ async def add_security_log(
     details="",
     actor_id=None
 ):
+    safe_details = str(details)[:1500]
+    safe_action = str(action)[:200]
+
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
@@ -144,6 +189,29 @@ async def add_security_log(
             (guild_id, action, details, actor_id)
             VALUES (?, ?, ?, ?)
             """,
-            (guild_id, action, details[:1500], actor_id)
+            (guild_id, safe_action, safe_details, actor_id)
         )
         await db.commit()
+
+    security_logger.info(
+        "guild_id=%s | action=%s | actor_id=%s | details=%s",
+        guild_id,
+        safe_action,
+        actor_id,
+        safe_details.replace("\n", " ")
+    )
+
+
+async def add_audit_log(
+    guild_id,
+    action,
+    details="",
+    actor_id=None
+):
+    audit_logger.info(
+        "guild_id=%s | action=%s | actor_id=%s | details=%s",
+        guild_id,
+        str(action)[:200],
+        actor_id,
+        str(details)[:1500].replace("\n", " ")
+    )
