@@ -17,16 +17,15 @@ from database.db import init_db, get_prefix
 from core.whitelist_permissions import init_whitelist_permissions
 
 
-# Configuration
 LOG_DIR = Path(DATA_DIR) / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
 BACKUP_DIR = Path(DATA_DIR) / "backups"
+
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(message)s",
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(LOG_DIR / "sentinel.log", encoding="utf-8"),
@@ -41,6 +40,7 @@ REPORT_INTERVAL = max(30, int(os.getenv("DASHBOARD_REPORT_INTERVAL", "60")))
 
 
 class SentinelGuard(commands.Bot):
+
     def __init__(self):
         intents = discord.Intents.default()
         intents.guilds = True
@@ -61,9 +61,10 @@ class SentinelGuard(commands.Bot):
         )
 
         self.started_at = time.monotonic()
-        self.dashboard_session = None
+        self.session = None
         self.report_task = None
         self.command_task = None
+        self.processed_commands = set()
 
     async def resolve_prefix(self, bot, message):
         if message.guild is None:
@@ -90,24 +91,20 @@ class SentinelGuard(commands.Bot):
 
         for extension in extensions:
             await self.load_extension(extension)
-            log.info("Loaded extension: %s", extension)
+            log.info("Loaded: %s", extension)
 
         await self.tree.sync()
         log.info("Slash commands synced")
 
         if DASHBOARD_URL and LOG_INGEST_TOKEN:
-            self.dashboard_session = aiohttp.ClientSession(
+            self.session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=15)
             )
-            self.report_task = asyncio.create_task(
-                self._dashboard_report_loop()
-            )
-            self.command_task = asyncio.create_task(
-                self._dashboard_command_loop()
-            )
-            log.info("Dashboard reporting and commands enabled")
+            self.report_task = asyncio.create_task(self._report_loop())
+            self.command_task = asyncio.create_task(self._command_loop())
+            log.info("Dashboard connected")
         else:
-            log.warning("Dashboard URL or token is missing")
+            log.warning("Dashboard URL or token missing")
 
     async def on_ready(self):
         log.info("Logged in as %s (%s)", self.user, self.user.id)
@@ -118,15 +115,15 @@ class SentinelGuard(commands.Bot):
                 name="your server security",
             )
         )
-        await self.report_dashboard_state()
 
-    # Dashboard API
-    async def _dashboard_request(self, method, endpoint, payload=None):
-        if not self.dashboard_session:
+        await self.report_state()
+
+    async def api(self, method, endpoint, payload=None):
+        if not self.session:
             return None
 
         try:
-            async with self.dashboard_session.request(
+            async with self.session.request(
                 method,
                 f"{DASHBOARD_URL}{endpoint}",
                 json=payload,
@@ -138,11 +135,7 @@ class SentinelGuard(commands.Bot):
                 body = await response.text()
 
                 if response.status != 200:
-                    log.warning(
-                        "Dashboard %s returned HTTP %s",
-                        endpoint,
-                        response.status,
-                    )
+                    log.warning("%s returned HTTP %s", endpoint, response.status)
                     return None
 
                 if not body:
@@ -151,24 +144,22 @@ class SentinelGuard(commands.Bot):
                 try:
                     return json.loads(body)
                 except json.JSONDecodeError:
-                    return {}
+                    log.warning("Invalid JSON from %s", endpoint)
+                    return None
 
+        except asyncio.CancelledError:
+            raise
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             log.warning("Dashboard request failed: %s", type(exc).__name__)
             return None
 
-    async def _dashboard_post(self, endpoint, payload):
-        return await self._dashboard_request("POST", endpoint, payload) is not None
-
-    # Database backup
     @staticmethod
-    def _create_backup():
+    def create_backup():
         source = Path(DB_PATH)
 
         if not source.is_file():
             raise FileNotFoundError("Database file not found")
 
-        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         target = BACKUP_DIR / (
             f"backup-{time.strftime('%Y%m%d-%H%M%S')}-"
             f"{uuid.uuid4().hex[:6]}.sqlite3"
@@ -181,80 +172,89 @@ class SentinelGuard(commands.Bot):
                     src.backup(dst)
 
             temporary.replace(target)
-            return f"Database backup created: {target.name}"
+            return f"Backup created: {target.name}"
 
         except Exception:
             temporary.unlink(missing_ok=True)
             raise
 
-    async def _dashboard_command_loop(self):
+    async def execute_command(self, command):
+        command_id = str(command.get("id", ""))
+        action = command.get("action")
+
+        if not command_id or command_id in self.processed_commands:
+            return
+
+        self.processed_commands.add(command_id)
+
+        if action == "backup_now":
+            try:
+                message = await asyncio.to_thread(self.create_backup)
+                result = {"ok": True, "message": message}
+                log.info("%s", message)
+            except Exception as exc:
+                log.exception("Backup failed")
+                result = {
+                    "ok": False,
+                    "message": f"Backup failed: {type(exc).__name__}",
+                }
+        else:
+            result = {
+                "ok": False,
+                "message": f"Unsupported action: {action}",
+            }
+
+        response = await self.api(
+            "POST",
+            f"/api/commands/{command_id}/result",
+            result,
+        )
+
+        if response is not None:
+            log.info("Command result submitted: %s", command_id)
+        else:
+            log.error("Command result submission failed: %s", command_id)
+
+    async def _command_loop(self):
         await self.wait_until_ready()
         log.info("Dashboard command polling started")
 
         while not self.is_closed():
             try:
-                data = await self._dashboard_request(
-                    "GET", "/api/commands"
-                )
+                data = await self.api("GET", "/api/commands")
 
-                commands_list = (
-                    data.get("commands", [])
-                    if isinstance(data, dict)
-                    else []
-                )
+                if data is None:
+                    log.warning("Could not fetch dashboard commands")
+                elif isinstance(data, dict):
+                    commands_list = data.get("commands", [])
 
-                for command in commands_list:
-                    if not isinstance(command, dict):
-                        continue
-
-                    if command.get("status") != "pending":
-                        continue
-
-                    command_id = str(command.get("id", ""))
-                    action = command.get("action")
-
-                    if not command_id:
-                        continue
-
-                    if action != "backup_now":
-                        result = {
-                            "ok": False,
-                            "message": f"Unsupported action: {action}",
-                        }
+                    if not isinstance(commands_list, list):
+                        log.warning("Invalid commands list")
                     else:
-                        try:
-                            message = await asyncio.to_thread(
-                                self._create_backup
-                            )
-                            result = {"ok": True, "message": message}
-                            log.info("%s", message)
-                        except Exception as exc:
-                            log.exception("Database backup failed")
-                            result = {
-                                "ok": False,
-                                "message": f"Backup failed: {type(exc).__name__}",
-                            }
+                        if commands_list:
+                            log.info("Received %s command(s)", len(commands_list))
 
-                    await self._dashboard_post(
-                        f"/api/commands/{command_id}/result",
-                        result,
-                    )
+                        for command in commands_list:
+                            if (
+                                isinstance(command, dict)
+                                and command.get("status") == "pending"
+                            ):
+                                await self.execute_command(command)
 
             except asyncio.CancelledError:
                 raise
             except Exception:
-                log.exception("Dashboard command polling failed")
+                log.exception("Command polling error")
 
             await asyncio.sleep(5)
 
-    # Server permissions
     @staticmethod
-    def _missing_permissions(guild):
+    def missing_permissions(guild):
         me = guild.me
+
         if me is None:
             return ["bot_member_unknown"]
 
-        permissions = me.guild_permissions
         required = (
             "view_audit_log",
             "manage_guild",
@@ -265,11 +265,10 @@ class SentinelGuard(commands.Bot):
 
         return [
             name for name in required
-            if not getattr(permissions, name)
+            if not getattr(me.guild_permissions, name)
         ]
 
-    # Dashboard state reporting
-    async def report_dashboard_state(self):
+    async def report_state(self):
         if not self.is_ready():
             return
 
@@ -296,23 +295,12 @@ class SentinelGuard(commands.Bot):
                 "disk_percent": disk.percent,
             }
         except Exception:
-            log.exception("Could not collect host metrics")
-            metrics = {
-                "cpu_cores": os.cpu_count() or 1,
-                "cpu_percent": 0,
-                "process_cpu_percent": None,
-                "ram_used": 0,
-                "ram_total": 0,
-                "ram_percent": 0,
-                "process_rss": None,
-                "disk_used": 0,
-                "disk_total": 0,
-                "disk_percent": 0,
-            }
+            log.exception("Host metrics unavailable")
+            metrics = {}
 
         database = Path(DB_PATH)
 
-        await self._dashboard_post("/api/state", {
+        await self.api("POST", "/api/state", {
             "type": "bot",
             "uptime_s": int(time.monotonic() - self.started_at),
             "latency_ms": latency,
@@ -327,10 +315,10 @@ class SentinelGuard(commands.Bot):
         })
 
         for guild in guilds:
-            owner = guild.owner
             me = guild.me
+            owner = guild.owner
 
-            await self._dashboard_post("/api/state", {
+            await self.api("POST", "/api/state", {
                 "type": "guild",
                 "id": guild.id,
                 "name": guild.name,
@@ -343,7 +331,7 @@ class SentinelGuard(commands.Bot):
                     me.joined_at.isoformat()
                     if me and me.joined_at else None
                 ),
-                "missing_perms": self._missing_permissions(guild),
+                "missing_perms": self.missing_permissions(guild),
                 "roles_above_bot": sum(
                     1 for role in guild.roles
                     if me and role > me.top_role and not role.is_default()
@@ -355,18 +343,18 @@ class SentinelGuard(commands.Bot):
                 "incident_total": 0,
             })
 
-        await self._dashboard_post("/api/logs", {
+        await self.api("POST", "/api/logs", {
             "type": "heartbeat",
             "guilds": len(guilds),
             "latency_ms": latency,
         })
 
-    async def _dashboard_report_loop(self):
+    async def _report_loop(self):
         await self.wait_until_ready()
 
         while not self.is_closed():
             try:
-                await self.report_dashboard_state()
+                await self.report_state()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -386,8 +374,8 @@ class SentinelGuard(commands.Bot):
                 except asyncio.CancelledError:
                     pass
 
-        if self.dashboard_session and not self.dashboard_session.closed:
-            await self.dashboard_session.close()
+        if self.session and not self.session.closed:
+            await self.session.close()
 
         await super().close()
 
