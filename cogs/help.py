@@ -1,11 +1,16 @@
-"""Premium interactive help center for Sentinel Guard.
+"""Sentinel Guard premium help panel.
 
-Replace the existing cogs/help.py with this file.
-Requires discord.py 2.x and the project's existing config.py/database.db modules.
+Keep this file at: cogs/help.py
+Place the banner image at: assets/help_banner.png
+
+Requires discord.py 2.x.
+The command/category content below is kept from the supplied help.py.
 """
 from __future__ import annotations
 
 import time
+from pathlib import Path
+
 import discord
 from discord.ext import commands
 
@@ -13,12 +18,14 @@ from config import DEVELOPER_ID, DEFAULT_PREFIX
 from database.db import get_prefix
 
 BLUE = discord.Color.from_rgb(35, 91, 170)
-DARK_BLUE = discord.Color.from_rgb(18, 31, 55)
 GOLD = discord.Color.from_rgb(230, 190, 92)
-GREEN = discord.Color.from_rgb(46, 204, 113)
-RED = discord.Color.from_rgb(231, 76, 60)
 
-# Keep command names aligned with the commands currently present in this repository.
+BASE_DIR = Path(__file__).resolve().parent.parent
+BANNER_PATH = BASE_DIR / "assets" / "1793447579821.png"
+
+# Replace this with your real support-server invite.
+SUPPORT_URL = "https://discord.gg/YOUR_SUPPORT_INVITE"
+
 PAGES: dict[str, dict] = {
     "Overview": {
         "emoji": "🛡️",
@@ -133,6 +140,13 @@ def _uptime_text(bot: commands.Bot) -> str:
     return " ".join(parts)
 
 
+def _visible_pages(developer_allowed: bool) -> list[str]:
+    return [
+        name for name in PAGES
+        if name != "Developer" or developer_allowed
+    ]
+
+
 def build_embed(
     bot: commands.Bot,
     page_name: str,
@@ -140,50 +154,72 @@ def build_embed(
     guild: discord.Guild | None,
 ) -> discord.Embed:
     page = PAGES[page_name]
-    embed = discord.Embed(
-        title=f"{page['emoji']}  {page['title']}",
-        description=page["description"],
-        color=GOLD if page_name == "Developer" else BLUE,
-        timestamp=discord.utils.utcnow(),
-    )
 
     if page_name == "Overview":
-        latency = round(bot.latency * 1000) if bot.latency is not None else None
-        embed.add_field(
-            name="📡 Gateway Latency",
-            value=f"`{latency} ms`" if latency is not None else "`Connecting…`",
-            inline=True,
+        embed = discord.Embed(
+            title="Sentinel Guard Help!",
+            description=(
+                "A powerful security and administration bot for your server.\n"
+                "Everything you need to protect, moderate and manage your community."
+            ),
+            color=BLUE,
         )
-        embed.add_field(name="🌐 Connected Servers", value=f"`{len(bot.guilds):,}`", inline=True)
-        embed.add_field(name="⏱️ Bot Uptime", value=f"`{_uptime_text(bot)}`", inline=True)
-        embed.add_field(name="⌨️ Server Prefix", value=f"`{discord.utils.escape_markdown(prefix)}`", inline=True)
+
+        categories = len(PAGES)
+        total_commands = sum(len(item["commands"]) for item in PAGES.values())
+        embed.add_field(
+            name="Quick Stats",
+            value=(
+                f"• **{categories}** Command Categories\n"
+                f"• **{total_commands}** Listed Commands\n"
+                "• **Security • Moderation • Recovery**"
+            ),
+            inline=False,
+        )
+        latency = round(bot.latency * 1000) if bot.latency is not None else "—"
+        embed.add_field(
+            name="System Status",
+            value=(
+                f"**Gateway latency:** `{latency} ms`\n"
+                f"**Connected servers:** `{len(bot.guilds):,}`\n"
+                f"**Bot uptime:** `{_uptime_text(bot)}`\n"
+                f"**Server prefix:** `{discord.utils.escape_markdown(prefix)}`"
+            ),
+            inline=False,
+        )
         if guild:
             embed.add_field(
-                name="🏠 Current Server",
+                name="Current Server",
                 value=discord.utils.escape_markdown(guild.name)[:100],
-                inline=True,
+                inline=False,
             )
         embed.add_field(
-            name="🧩 Protection Modules",
-            value="`AntiNuke`  •  `AntiRaid`  •  `AutoMod`  •  `Moderation`  •  `Recovery`",
+            name="Choose a category",
+            value="Select a category from the menu below to view its commands and required permissions.",
             inline=False,
         )
-
-    for command_name, description, access in page["commands"]:
-        rendered = command_name.replace("{p}", prefix)
-        # Prevent a page from exceeding Discord's 25-field embed limit.
-        if len(embed.fields) >= 24:
-            embed.add_field(name="More commands", value="Use the developer command reference for additional operations.", inline=False)
-            break
-        embed.add_field(
-            name=f"`{rendered}`",
-            value=f"{description}\n**Required access:** {access}",
-            inline=False,
+    else:
+        embed = discord.Embed(
+            title=f"{page['emoji']}  {page['title']}",
+            description=page["description"],
+            color=GOLD if page_name == "Developer" else BLUE,
         )
+        for command_name, description, access in page["commands"]:
+            rendered = command_name.replace("{p}", prefix)
+            embed.add_field(
+                name=f"`{rendered}`",
+                value=f"{description}\n**Required access:** {access}",
+                inline=False,
+            )
 
-    embed.set_footer(text="SENTINEL GUARD  •  SECURITY  •  MODERATION  •  RECOVERY")
+    embed.set_footer(text="Develop by MOD TRYOUT")
     if bot.user:
-        embed.set_author(name="Sentinel Guard Security Center", icon_url=bot.user.display_avatar.url)
+        embed.set_author(
+            name="Sentinel Guard Security Center",
+            icon_url=bot.user.display_avatar.url,
+        )
+    # The uploaded banner is attached to the help message as help_banner.png.
+    embed.set_image(url="attachment://help_banner.png")
     return embed
 
 
@@ -193,16 +229,18 @@ class HelpSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=name,
-                description=page["description"][:100],
+                description=(
+                    "Main help page" if name == "Overview"
+                    else PAGES[name]["description"][:100]
+                ),
                 value=name,
-                emoji=page["emoji"],
+                emoji="📖" if name == "Overview" else PAGES[name]["emoji"],
                 default=name == help_view.page_name,
             )
-            for name, page in PAGES.items()
-            if name != "Developer" or help_view.developer_allowed
+            for name in _visible_pages(help_view.developer_allowed)
         ]
         super().__init__(
-            placeholder="Choose a security module…",
+            placeholder="Choose a category...",
             min_values=1,
             max_values=1,
             options=options,
@@ -210,8 +248,7 @@ class HelpSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        selected = self.values[0]
-        await self.help_view.show_page(interaction, selected)
+        await self.help_view.show_page(interaction, self.values[0])
 
 
 class HelpView(discord.ui.View):
@@ -220,21 +257,13 @@ class HelpView(discord.ui.View):
         bot: commands.Bot,
         prefix: str,
         requester_id: int,
-        guild_id: int | None,
     ):
         super().__init__(timeout=180)
         self.bot = bot
         self.prefix = prefix
         self.requester_id = requester_id
-        self.guild_id = guild_id
         self.developer_allowed = bool(DEVELOPER_ID and requester_id == DEVELOPER_ID)
         self.page_name = "Overview"
-        self.add_item(HelpSelect(self))
-
-    def refresh_select(self) -> None:
-        for item in list(self.children):
-            if isinstance(item, HelpSelect):
-                self.remove_item(item)
         self.add_item(HelpSelect(self))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -247,7 +276,7 @@ class HelpView(discord.ui.View):
         return True
 
     async def show_page(self, interaction: discord.Interaction, page_name: str) -> None:
-        if page_name == "Developer" and not self.developer_allowed:
+        if page_name not in _visible_pages(self.developer_allowed):
             await interaction.response.send_message(
                 "This section is restricted to the configured bot developer.",
                 ephemeral=True,
@@ -255,21 +284,15 @@ class HelpView(discord.ui.View):
             return
 
         self.page_name = page_name
-        self.refresh_select()
+        for item in list(self.children):
+            if isinstance(item, HelpSelect):
+                self.remove_item(item)
+        self.add_item(HelpSelect(self))
+
         await interaction.response.edit_message(
             embed=build_embed(self.bot, page_name, self.prefix, interaction.guild),
             view=self,
         )
-
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, emoji="◀️", row=1)
-    async def previous_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ) -> None:
-        pages = [name for name in PAGES if name != "Developer" or self.developer_allowed]
-        current = pages.index(self.page_name) if self.page_name in pages else 0
-        await self.show_page(interaction, pages[(current - 1) % len(pages)])
 
     @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="🏠", row=1)
     async def home_button(
@@ -278,16 +301,6 @@ class HelpView(discord.ui.View):
         button: discord.ui.Button,
     ) -> None:
         await self.show_page(interaction, "Overview")
-
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, emoji="▶️", row=1)
-    async def next_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ) -> None:
-        pages = [name for name in PAGES if name != "Developer" or self.developer_allowed]
-        current = pages.index(self.page_name) if self.page_name in pages else 0
-        await self.show_page(interaction, pages[(current + 1) % len(pages)])
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="✖️", row=1)
     async def close_button(
@@ -306,7 +319,7 @@ class Help(commands.Cog):
 
     @commands.hybrid_command(
         name="help",
-        description="Open the Sentinel Guard interactive security center",
+        description="Open the Sentinel Guard interactive help center",
     )
     async def help_command(self, ctx: commands.Context) -> None:
         prefix = DEFAULT_PREFIX
@@ -317,12 +330,45 @@ class Help(commands.Cog):
             bot=self.bot,
             prefix=prefix,
             requester_id=ctx.author.id,
-            guild_id=ctx.guild.id if ctx.guild else None,
         )
         embed = build_embed(self.bot, "Overview", prefix, ctx.guild)
+
+        files = []
+        if BANNER_PATH.is_file():
+            files.append(discord.File(BANNER_PATH, filename="help_banner.png"))
+        else:
+            embed.set_image(url=None)
+
+        if self.bot.user:
+            invite_url = (
+                "https://discord.com/oauth2/authorize"
+                f"?client_id={self.bot.user.id}&scope=bot%20applications.commands"
+            )
+            view.add_item(
+                discord.ui.Button(
+                    label="Invite Me",
+                    style=discord.ButtonStyle.link,
+                    url=invite_url,
+                    emoji="🤖",
+                    row=2,
+                )
+            )
+
+        if SUPPORT_URL and "YOUR_SUPPORT_INVITE" not in SUPPORT_URL:
+            view.add_item(
+                discord.ui.Button(
+                    label="Support",
+                    style=discord.ButtonStyle.link,
+                    url=SUPPORT_URL,
+                    emoji="🔗",
+                    row=2,
+                )
+            )
+
         await ctx.send(
             embed=embed,
             view=view,
+            files=files,
             ephemeral=ctx.interaction is not None,
         )
 
