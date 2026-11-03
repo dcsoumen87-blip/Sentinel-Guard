@@ -30,12 +30,12 @@ SUPPORT_URL = "https://discord.gg/YOUR_SUPPORT_INVITE"
 
 PAGES: dict[str, dict] = {
     "Overview": {
-        "emoji": "ðŸ›¡ï¸",
-        "title": "Sentinel Guard â€¢ Security Center",
+        "emoji": "\U0001F6E1\uFE0F",
+        "title": "Sentinel Guard - Security Center",
         "description": (
             "Your central control panel for server protection, moderation and recovery.\n"
             "Choose a module from the menu to see its commands and required permissions.\n\n"
-            "**Quick Start:** `/security_setup` â†’ `/autosetup` â†’ Done!"
+            "**Quick Start:** `/security_setup` -> `/autosetup` -> Done!"
         ),
         "commands": [
             ("/help", "Open this interactive help panel.", "Everyone"),
@@ -49,12 +49,12 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Setup & Auto-Setup": {
-        "emoji": "âš¡",
+        "emoji": "\U000026A1",
         "title": "Setup & Auto-Setup",
         "description": "One-command server security initialization and role synchronization.",
         "commands": [
             ("/security_setup", "Create Sentinel roles, log channel, and security category with colors.", "Manage Server"),
-            ("/autosetup", "Fully automatic setup: roles, channels, configs, AntiNuke, AutoMod, Lockdown â€” all at once.", "Manage Server"),
+            ("/autosetup", "Fully automatic setup: roles, channels, configs, AntiNuke, AutoMod, Lockdown - all at once.", "Manage Server"),
             ("/syncroles", "Sync all Sentinel role colors, permissions, hoist, and mentionable settings.", "Manage Server"),
             ("/setsecuritylogs #channel", "Set or update the security log channel.", "Manage Server"),
             ("/setprefix <prefix>", "Change this server's command prefix (1-4 chars).", "Manage Server"),
@@ -62,7 +62,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "AntiNuke": {
-        "emoji": "â˜¢ï¸",
+        "emoji": "\U00002622\uFE0F",
         "title": "AntiNuke Protection",
         "description": "Configure destructive-action detection, trusted-member controls, and **automatic lockdown on nuke attempts**.",
         "commands": [
@@ -79,18 +79,18 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Lockdown / Panic Mode": {
-        "emoji": "ðŸ”’",
+        "emoji": "\U0001F512",
         "title": "Server Lockdown & Panic Mode",
-        "description": "Emergency server lockdown â€” denies @everyone Send Messages in all text channels. **Auto-triggers on nuke detection.**\n\nOnly Server Owner or Extra Owners can use these.",
+        "description": "Emergency server lockdown - denies @everyone Send Messages in all text channels. **Auto-triggers on nuke detection.**\n\nOnly Server Owner or Extra Owners can use these.",
         "commands": [
-            ("/lockdown enable [reason]", "Enable full server lockdown (panic mode).", "Server Owner / Extra Owner"),
-            ("/lockdown disable [reason]", "Disable lockdown and restore permissions.", "Server Owner / Extra Owner"),
+            ("/lockdown state:Enable [reason]", "Enable full server lockdown (panic mode).", "Server Owner / Extra Owner"),
+            ("/lockdown state:Disable [reason]", "Disable lockdown and restore permissions.", "Server Owner / Extra Owner"),
             ("/lockdown_status", "Check current lockdown state and locked channel count.", "Manage Server"),
-            ("/panic enable|disable|toggle [reason]", "Quick panic mode toggle (alias for lockdown).", "Manage Server"),
+            ("/panic enable|disable|toggle", "Quick panic mode toggle (alias for lockdown).", "Server Owner / Extra Owner"),
         ],
     },
     "AntiRaid": {
-        "emoji": "ðŸš¨",
+        "emoji": "\U0001F6A8",
         "title": "AntiRaid Monitoring",
         "description": "Monitor join spikes and configure raid protection with enable/disable.",
         "commands": [
@@ -98,10 +98,11 @@ PAGES: dict[str, dict] = {
             ("/raidmode enable", "Enable AntiRaid monitoring and alerts.", "Manage Server"),
             ("/raidmode disable", "Disable AntiRaid monitoring.", "Manage Server"),
             ("/raidmode toggle", "Quick toggle AntiRaid on/off.", "Manage Server"),
+            ("/raidmode config <threshold> <seconds>", "Set join threshold (3-50) and window (10-120s).", "Manage Server"),
         ],
     },
     "AutoMod": {
-        "emoji": "âš™ï¸",
+        "emoji": "\U00002699\uFE0F",
         "title": "Automated Moderation",
         "description": "Message flood, mass mentions, suspicious links, invites, and duplicate detection with full config.",
         "commands": [
@@ -113,7 +114,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Moderation": {
-        "emoji": "âš–ï¸",
+        "emoji": "\U00002696\uFE0F",
         "title": "Member Moderation",
         "description": "Standard moderation commands. Use responsibly and follow your server's rules.",
         "commands": [
@@ -125,7 +126,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Configuration": {
-        "emoji": "ðŸ”§",
+        "emoji": "\U0001F527",
         "title": "Server Configuration",
         "description": "Manage server-specific prefix and security logging settings.",
         "commands": [
@@ -135,7 +136,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Recovery & Backups": {
-        "emoji": "ðŸ’¾",
+        "emoji": "\U0001F4BE",
         "title": "Recovery & Backups",
         "description": "Database health checks, SQLite snapshots, and configuration drift detection.",
         "commands": [
@@ -147,7 +148,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Permissions & Whitelist": {
-        "emoji": "ðŸ”",
+        "emoji": "\U0001F510",
         "title": "Permissions & Whitelist",
         "description": "Server Owner only: Extra Owners, AntiNuke whitelist, and granular permissions.",
         "commands": [
@@ -160,7 +161,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Developer": {
-        "emoji": "ðŸ‘‘",
+        "emoji": "\U0001F451",
         "title": "Developer Operations",
         "description": "Restricted diagnostics and operational commands for the configured developer.",
         "commands": [
@@ -173,6 +174,7 @@ PAGES: dict[str, dict] = {
             ("/devuptime", "View bot/host uptime.", "Bot Developer"),
             ("/devhealth", "Check gateway and database health.", "Bot Developer"),
             ("/devstats", "View bot statistics.", "Bot Developer"),
+            ("/devinfo", "Show bot information.", "Bot Developer"),
             ("/devbackup", "Create a database backup.", "Bot Developer"),
             ("/devlogs", "View log information.", "Bot Developer"),
             ("/devreload <extension>", "Reload an approved extension.", "Bot Developer"),
@@ -220,11 +222,11 @@ def build_embed(
 
     if page_name == "Overview":
         embed = discord.Embed(
-            title="ðŸ›¡ï¸ Sentinel Guard â€¢ Security Center",
+            title="Sentinel Guard - Security Center",
             description=(
                 "A powerful security and administration bot for your server.\n"
                 "Everything you need to protect, moderate and manage your community.\n\n"
-                "**Quick Start:** `/autosetup` â€” One command, full protection."
+                "**Quick Start:** `/autosetup` - One command, full protection."
             ),
             color=BLUE,
         )
@@ -234,13 +236,13 @@ def build_embed(
         embed.add_field(
             name="Quick Stats",
             value=(
-                f"â€¢ **{categories}** Command Categories\n"
-                f"â€¢ **{total_commands}** Listed Commands\n"
-                "â€¢ **Security â€¢ Moderation â€¢ Recovery â€¢ Auto-Setup**"
+                f"- **{categories}** Command Categories\n"
+                f"- **{total_commands}** Listed Commands\n"
+                "- **Security - Moderation - Recovery - Auto-Setup**"
             ),
             inline=False,
         )
-        latency = round(bot.latency * 1000) if bot.latency is not None else "â€”"
+        latency = round(bot.latency * 1000) if bot.latency is not None else "-"
         embed.add_field(
             name="System Status",
             value=(
@@ -276,7 +278,7 @@ def build_embed(
                 inline=False,
             )
 
-    embed.set_footer(text="Developed by MOD TRYOUT â€¢ Sentinel Guard")
+    embed.set_footer(text="Developed by MOD TRYOUT - Sentinel Guard")
     if bot.user:
         embed.set_author(
             name="Sentinel Guard Security Center",
@@ -298,7 +300,7 @@ class HelpSelect(discord.ui.Select):
                     else PAGES[name]["description"][:100]
                 ),
                 value=name,
-                emoji="ðŸ“–" if name == "Overview" else PAGES[name]["emoji"],
+                emoji="\U0001F4D6" if name == "Overview" else PAGES[name]["emoji"],
                 default=name == help_view.page_name,
             )
             for name in _visible_pages(help_view.developer_allowed)
@@ -358,7 +360,7 @@ class HelpView(discord.ui.View):
             view=self,
         )
 
-    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="ðŸ ", row=1)
+    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="\U0001F3E0", row=1)
     async def home_button(
         self,
         interaction: discord.Interaction,
@@ -366,7 +368,7 @@ class HelpView(discord.ui.View):
     ) -> None:
         await self.show_page(interaction, "Overview")
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="âœ–ï¸", row=1)
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="\U00002716\uFE0F", row=1)
     async def close_button(
         self,
         interaction: discord.Interaction,
@@ -413,7 +415,7 @@ class Help(commands.Cog):
                     label="Invite Me",
                     style=discord.ButtonStyle.link,
                     url=invite_url,
-                    emoji="ðŸ¤–",
+                    emoji="\U0001F916",
                     row=2,
                 )
             )
@@ -424,7 +426,7 @@ class Help(commands.Cog):
                     label="Support",
                     style=discord.ButtonStyle.link,
                     url=SUPPORT_URL,
-                    emoji="ðŸ”—",
+                    emoji="\U0001F517",
                     row=2,
                 )
             )
