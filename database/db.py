@@ -73,7 +73,7 @@ SCHEMA = [
         threshold INTEGER NOT NULL DEFAULT 4,
         window_seconds INTEGER NOT NULL DEFAULT 10,
         alert_channel_id INTEGER,
-        mode TEXT NOT NULL DEFAULT 'alert'
+        mode TEXT NOT NULL DEFAULT 'ban'
     )
     """,
     """
