@@ -19,6 +19,8 @@ from database.db import get_prefix
 
 BLUE = discord.Color.from_rgb(35, 91, 170)
 GOLD = discord.Color.from_rgb(230, 190, 92)
+GREEN = discord.Color.from_rgb(46, 204, 113)
+RED = discord.Color.from_rgb(231, 76, 60)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BANNER_PATH = BASE_DIR / "assets" / "1793447579821.png"
@@ -28,96 +30,157 @@ SUPPORT_URL = "https://discord.gg/YOUR_SUPPORT_INVITE"
 
 PAGES: dict[str, dict] = {
     "Overview": {
-        "emoji": "🛡️",
-        "title": "Sentinel Guard • Security Center",
+        "emoji": "ðŸ›¡ï¸",
+        "title": "Sentinel Guard â€¢ Security Center",
         "description": (
             "Your central control panel for server protection, moderation and recovery.\n"
-            "Choose a module from the menu to see its commands and required permissions."
+            "Choose a module from the menu to see its commands and required permissions.\n\n"
+            "**Quick Start:** `/security_setup` â†’ `/autosetup` â†’ Done!"
         ),
         "commands": [
-            ("{p}help", "Open this interactive help panel.", "Everyone"),
-            ("{p}securityconfig", "View this server's security configuration.", "Manage Server"),
-            ("{p}setsecuritylogs #channel", "Choose the security log channel.", "Manage Server"),
-            ("{p}antinuke status", "View AntiNuke configuration and status.", "Manage Server"),
+            ("/help", "Open this interactive help panel.", "Everyone"),
+            ("/security_setup", "Initial security setup (roles, logs, category).", "Manage Server"),
+            ("/autosetup", "Fully automatic one-click server setup.", "Manage Server"),
+            ("/securityconfig", "View this server's security configuration.", "Manage Server"),
+            ("/setsecuritylogs #channel", "Choose the security log channel.", "Manage Server"),
+            ("/antinuke status", "View AntiNuke configuration and status.", "Manage Server"),
+            ("/automod status", "View AutoMod configuration and status.", "Manage Server"),
+            ("/lockdown_status", "Check current lockdown/panic mode status.", "Manage Server"),
+        ],
+    },
+    "Setup & Auto-Setup": {
+        "emoji": "âš¡",
+        "title": "Setup & Auto-Setup",
+        "description": "One-command server security initialization and role synchronization.",
+        "commands": [
+            ("/security_setup", "Create Sentinel roles, log channel, and security category with colors.", "Manage Server"),
+            ("/autosetup", "Fully automatic setup: roles, channels, configs, AntiNuke, AutoMod, Lockdown â€” all at once.", "Manage Server"),
+            ("/syncroles", "Sync all Sentinel role colors, permissions, hoist, and mentionable settings.", "Manage Server"),
+            ("/setsecuritylogs #channel", "Set or update the security log channel.", "Manage Server"),
+            ("/setprefix <prefix>", "Change this server's command prefix (1-4 chars).", "Manage Server"),
+            ("/securityconfig", "View complete security configuration overview.", "Manage Server"),
         ],
     },
     "AntiNuke": {
-        "emoji": "☢️",
+        "emoji": "â˜¢ï¸",
         "title": "AntiNuke Protection",
-        "description": "Configure destructive-action detection and trusted-member controls.",
+        "description": "Configure destructive-action detection, trusted-member controls, and **automatic lockdown on nuke attempts**.",
         "commands": [
-            ("{p}antinuke status", "Show AntiNuke configuration.", "Manage Server"),
-            ("{p}antinuke setup", "Initialize AntiNuke protection for this server.", "Manage Server"),
-            ("{p}antinuke threshold <count> <seconds>", "Set the event threshold and detection window.", "Manage Server"),
-            ("{p}antinuke alertchannel #channel", "Set where AntiNuke alerts are sent.", "Manage Server"),
-            ("{p}antinuke whitelist-add @member", "Add a trusted member to the whitelist.", "Manage Server"),
-            ("{p}antinuke whitelist-remove @member", "Remove a member from the whitelist.", "Manage Server"),
+            ("/antinuke status", "Show AntiNuke configuration, threshold, window, alert channel.", "Manage Server"),
+            ("/antinuke enable", "Enable AntiNuke monitoring (channel create/delete detection).", "Manage Server"),
+            ("/antinuke disable", "Disable AntiNuke monitoring completely.", "Manage Server"),
+            ("/antinuke toggle", "Quick toggle AntiNuke on/off.", "Manage Server"),
+            ("/antinuke threshold <count> <seconds>", "Set event threshold (2-20) and detection window (3-60s).", "Manage Server"),
+            ("/antinuke alertchannel #channel", "Set where AntiNuke alerts are sent.", "Manage Server"),
+            ("/antinuke whitelist-add @member", "Add a trusted member to the AntiNuke whitelist.", "Manage Server"),
+            ("/antinuke whitelist-remove @member", "Remove a member from the whitelist.", "Manage Server"),
+            ("/antinuke whitelist-list", "List all whitelisted members.", "Manage Server"),
+            ("/antinuke incidents [limit]", "View recent AntiNuke incidents (default 10, max 25).", "Manage Server"),
+        ],
+    },
+    "Lockdown / Panic Mode": {
+        "emoji": "ðŸ”’",
+        "title": "Server Lockdown & Panic Mode",
+        "description": "Emergency server lockdown â€” denies @everyone Send Messages in all text channels. **Auto-triggers on nuke detection.**\n\nOnly Server Owner or Extra Owners can use these.",
+        "commands": [
+            ("/lockdown enable [reason]", "Enable full server lockdown (panic mode).", "Server Owner / Extra Owner"),
+            ("/lockdown disable [reason]", "Disable lockdown and restore permissions.", "Server Owner / Extra Owner"),
+            ("/lockdown_status", "Check current lockdown state and locked channel count.", "Manage Server"),
+            ("/panic enable|disable|toggle [reason]", "Quick panic mode toggle (alias for lockdown).", "Manage Server"),
         ],
     },
     "AntiRaid": {
-        "emoji": "🚨",
+        "emoji": "ðŸš¨",
         "title": "AntiRaid Monitoring",
-        "description": "Check the current join-spike and raid-monitoring status.",
+        "description": "Monitor join spikes and configure raid protection with enable/disable.",
         "commands": [
-            ("{p}raidstatus", "Review AntiRaid monitoring status.", "Manage Server"),
+            ("/raidstatus", "Review AntiRaid join-spike monitoring status.", "Manage Server"),
+            ("/raidmode enable", "Enable AntiRaid monitoring and alerts.", "Manage Server"),
+            ("/raidmode disable", "Disable AntiRaid monitoring.", "Manage Server"),
+            ("/raidmode toggle", "Quick toggle AntiRaid on/off.", "Manage Server"),
         ],
     },
     "AutoMod": {
-        "emoji": "⚙️",
+        "emoji": "âš™ï¸",
         "title": "Automated Moderation",
-        "description": "Inspect the automated moderation module's current status.",
+        "description": "Message flood, mass mentions, suspicious links, invites, and duplicate detection with full config.",
         "commands": [
-            ("{p}automodstatus", "Review AutoMod status.", "Manage Server"),
+            ("/automod status", "Show AutoMod configuration and active filters.", "Manage Server"),
+            ("/automod enable", "Enable AutoMod message filtering.", "Manage Server"),
+            ("/automod disable", "Disable AutoMod completely.", "Manage Server"),
+            ("/automod toggle", "Quick toggle AutoMod on/off.", "Manage Server"),
+            ("/automod logging on|off", "Enable/disable AutoMod action logging to security logs.", "Manage Server"),
         ],
     },
     "Moderation": {
-        "emoji": "⚖️",
+        "emoji": "âš–ï¸",
         "title": "Member Moderation",
-        "description": "Moderation commands. Use responsibly and follow your server's rules.",
+        "description": "Standard moderation commands. Use responsibly and follow your server's rules.",
         "commands": [
-            ("{p}kick @member [reason]", "Remove a member from the server.", "Kick Members"),
-            ("{p}ban @member [reason]", "Ban a member from the server.", "Ban Members"),
-            ("{p}timeout @member <minutes> [reason]", "Temporarily restrict a member.", "Moderate Members"),
-            ("{p}purge <amount>", "Delete a specified number of recent messages.", "Manage Messages"),
+            ("/kick @member [reason]", "Remove a member from the server.", "Kick Members"),
+            ("/ban @member [reason]", "Ban a member from the server.", "Ban Members"),
+            ("/timeout @member <minutes> [reason]", "Temporarily restrict a member (1-40320 min).", "Moderate Members"),
+            ("/purge <amount>", "Delete recent messages (1-100).", "Manage Messages"),
+            ("/warn @member [reason]", "Issue a warning (logged to database).", "Moderate Members"),
         ],
     },
     "Configuration": {
-        "emoji": "🔧",
+        "emoji": "ðŸ”§",
         "title": "Server Configuration",
         "description": "Manage server-specific prefix and security logging settings.",
         "commands": [
-            ("{p}securityconfig", "View this server's current configuration.", "Manage Server"),
-            ("{p}setprefix <prefix>", "Change this server's command prefix.", "Manage Server"),
-            ("{p}setsecuritylogs #channel", "Set the security log destination.", "Manage Server"),
+            ("/securityconfig", "View this server's current configuration.", "Manage Server"),
+            ("/setprefix <prefix>", "Change this server's command prefix (1-4 chars).", "Manage Server"),
+            ("/setsecuritylogs #channel", "Set the security log destination.", "Manage Server"),
         ],
     },
-    "Recovery": {
-        "emoji": "💾",
+    "Recovery & Backups": {
+        "emoji": "ðŸ’¾",
         "title": "Recovery & Backups",
-        "description": "Recovery and backup operations available in the current command set.",
+        "description": "Database health checks, SQLite snapshots, and configuration drift detection.",
         "commands": [
-            ("{p}devrecovery", "Review developer recovery information.", "Bot Developer"),
-            ("{p}devbackup", "Create a SQLite recovery backup.", "Bot Developer"),
-            ("{p}devlogs", "Review application log information.", "Bot Developer"),
+            ("/recovery_status", "Check database, backup, and security setup health.", "Manage Server"),
+            ("/recovery_backup", "Create a consistent SQLite snapshot (local).", "Administrator"),
+            ("/devrecovery", "Developer recovery diagnostics.", "Bot Developer"),
+            ("/devbackup", "Create a SQLite recovery backup (dev).", "Bot Developer"),
+            ("/devlogs", "Review application log information.", "Bot Developer"),
+        ],
+    },
+    "Permissions & Whitelist": {
+        "emoji": "ðŸ”",
+        "title": "Permissions & Whitelist",
+        "description": "Server Owner only: Extra Owners, AntiNuke whitelist, and granular permissions.",
+        "commands": [
+            ("/extraowner_add @member", "Add a server-specific Extra Owner.", "Server Owner"),
+            ("/extraowner_remove @member", "Remove an Extra Owner.", "Server Owner"),
+            ("/extraowner_list", "List all Extra Owners.", "Server Owner"),
+            ("/whitelist_add @member", "Add member to AntiNuke whitelist.", "Server Owner"),
+            ("/whitelist_remove @member", "Remove from whitelist and clear permissions.", "Server Owner"),
+            ("/whitelist_permission grant|revoke|check @member <permission>", "Manage whitelist permissions (channel_create, channel_delete, member_kick, member_ban, admin_grant).", "Server Owner"),
         ],
     },
     "Developer": {
-        "emoji": "👑",
+        "emoji": "ðŸ‘‘",
         "title": "Developer Operations",
         "description": "Restricted diagnostics and operational commands for the configured developer.",
         "commands": [
-            ("{p}devhelp", "Open the developer command reference.", "Bot Developer"),
-            ("{p}devsystem", "Inspect host resource usage.", "Bot Developer"),
-            ("{p}devcpu", "Inspect CPU usage.", "Bot Developer"),
-            ("{p}devram", "Inspect memory usage.", "Bot Developer"),
-            ("{p}devdisk", "Inspect disk usage.", "Bot Developer"),
-            ("{p}devnetwork", "Inspect network information.", "Bot Developer"),
-            ("{p}devuptime", "View bot/host uptime.", "Bot Developer"),
-            ("{p}devhealth", "Check gateway and database health.", "Bot Developer"),
-            ("{p}devstats", "View bot statistics.", "Bot Developer"),
-            ("{p}devbackup", "Create a database backup.", "Bot Developer"),
-            ("{p}devlogs", "View log information.", "Bot Developer"),
-            ("{p}devreload <extension>", "Reload an approved extension.", "Bot Developer"),
+            ("/devhelp", "Open the developer command reference.", "Bot Developer"),
+            ("/devsystem", "Inspect host resource usage (CPU, RAM, Disk, Network).", "Bot Developer"),
+            ("/devcpu", "Inspect CPU usage.", "Bot Developer"),
+            ("/devram", "Inspect memory usage.", "Bot Developer"),
+            ("/devdisk", "Inspect disk usage.", "Bot Developer"),
+            ("/devnetwork", "Inspect network information.", "Bot Developer"),
+            ("/devuptime", "View bot/host uptime.", "Bot Developer"),
+            ("/devhealth", "Check gateway and database health.", "Bot Developer"),
+            ("/devstats", "View bot statistics.", "Bot Developer"),
+            ("/devbackup", "Create a database backup.", "Bot Developer"),
+            ("/devlogs", "View log information.", "Bot Developer"),
+            ("/devreload <extension>", "Reload an approved extension.", "Bot Developer"),
+            ("/devservers", "List all servers the bot is in.", "Bot Developer"),
+            ("/devsetup", "Check security setup status for current server.", "Bot Developer"),
+            ("/devroleclaim", "Claim Sentinel Developer role (Owner only).", "Bot Developer"),
+            ("/devmaintenance", "Maintenance status.", "Bot Developer"),
+            ("/devversion", "Show software versions.", "Bot Developer"),
         ],
     },
 }
@@ -157,26 +220,27 @@ def build_embed(
 
     if page_name == "Overview":
         embed = discord.Embed(
-            title="Sentinel Guard Help!",
+            title="ðŸ›¡ï¸ Sentinel Guard â€¢ Security Center",
             description=(
                 "A powerful security and administration bot for your server.\n"
-                "Everything you need to protect, moderate and manage your community."
+                "Everything you need to protect, moderate and manage your community.\n\n"
+                "**Quick Start:** `/autosetup` â€” One command, full protection."
             ),
             color=BLUE,
         )
 
-        categories = len(PAGES)
-        total_commands = sum(len(item["commands"]) for item in PAGES.values())
+        categories = len(PAGES) - 1  # Exclude Developer from count
+        total_commands = sum(len(item["commands"]) for name, item in PAGES.items() if name != "Developer")
         embed.add_field(
             name="Quick Stats",
             value=(
-                f"• **{categories}** Command Categories\n"
-                f"• **{total_commands}** Listed Commands\n"
-                "• **Security • Moderation • Recovery**"
+                f"â€¢ **{categories}** Command Categories\n"
+                f"â€¢ **{total_commands}** Listed Commands\n"
+                "â€¢ **Security â€¢ Moderation â€¢ Recovery â€¢ Auto-Setup**"
             ),
             inline=False,
         )
-        latency = round(bot.latency * 1000) if bot.latency is not None else "—"
+        latency = round(bot.latency * 1000) if bot.latency is not None else "â€”"
         embed.add_field(
             name="System Status",
             value=(
@@ -199,20 +263,20 @@ def build_embed(
             inline=False,
         )
     else:
+        color = GOLD if page_name == "Developer" else (RED if page_name == "Lockdown / Panic Mode" else BLUE)
         embed = discord.Embed(
             title=f"{page['emoji']}  {page['title']}",
             description=page["description"],
-            color=GOLD if page_name == "Developer" else BLUE,
+            color=color,
         )
         for command_name, description, access in page["commands"]:
-            rendered = command_name.replace("{p}", prefix)
             embed.add_field(
-                name=f"`{rendered}`",
+                name=f"`{command_name}`",
                 value=f"{description}\n**Required access:** {access}",
                 inline=False,
             )
 
-    embed.set_footer(text="Develop by MOD TRYOUT")
+    embed.set_footer(text="Developed by MOD TRYOUT â€¢ Sentinel Guard")
     if bot.user:
         embed.set_author(
             name="Sentinel Guard Security Center",
@@ -234,7 +298,7 @@ class HelpSelect(discord.ui.Select):
                     else PAGES[name]["description"][:100]
                 ),
                 value=name,
-                emoji="📖" if name == "Overview" else PAGES[name]["emoji"],
+                emoji="ðŸ“–" if name == "Overview" else PAGES[name]["emoji"],
                 default=name == help_view.page_name,
             )
             for name in _visible_pages(help_view.developer_allowed)
@@ -294,7 +358,7 @@ class HelpView(discord.ui.View):
             view=self,
         )
 
-    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="🏠", row=1)
+    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="ðŸ ", row=1)
     async def home_button(
         self,
         interaction: discord.Interaction,
@@ -302,7 +366,7 @@ class HelpView(discord.ui.View):
     ) -> None:
         await self.show_page(interaction, "Overview")
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="✖️", row=1)
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="âœ–ï¸", row=1)
     async def close_button(
         self,
         interaction: discord.Interaction,
@@ -349,7 +413,7 @@ class Help(commands.Cog):
                     label="Invite Me",
                     style=discord.ButtonStyle.link,
                     url=invite_url,
-                    emoji="🤖",
+                    emoji="ðŸ¤–",
                     row=2,
                 )
             )
@@ -360,7 +424,7 @@ class Help(commands.Cog):
                     label="Support",
                     style=discord.ButtonStyle.link,
                     url=SUPPORT_URL,
-                    emoji="🔗",
+                    emoji="ðŸ”—",
                     row=2,
                 )
             )
