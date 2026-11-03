@@ -100,7 +100,7 @@ class AntiNuke(commands.Cog):
             log.error("ALERT_CHANNEL_MISSING guild=%s id=%s", guild.id, cfg["alert"])
             return
         e = discord.Embed(
-            title="ðŸš¨ Sentinel Guard | Anti-Nuke Alert",
+            title="Sentinel Guard | Anti-Nuke Alert",
             description="Rapid channel activity reached the configured threshold.",
             color=discord.Color.red(),
             timestamp=discord.utils.utcnow(),
@@ -192,9 +192,9 @@ class AntiNuke(commands.Cog):
                 if isinstance(log_channel, discord.TextChannel):
                     try:
                         embed = discord.Embed(
-                            title="ðŸ”’ AUTO-LOCKDOWN TRIGGERED",
+                            title="AUTO-LOCKDOWN TRIGGERED",
                             description=(
-                                f"**AntiNuke detected nuke attempt â€” server automatically locked down.**\n\n"
+                                f"**AntiNuke detected nuke attempt - server automatically locked down.**\n\n"
                                 f"**Trigger:** {reason}\n"
                                 f"**Actor:** {actor.mention} (`{actor.id}`)\n"
                                 f"**Channels locked:** {len(affected_channels)}\n"
@@ -277,13 +277,13 @@ class AntiNuke(commands.Cog):
     @commands.guild_only()
     async def status(self, ctx):
         c = await self.config(ctx.guild.id)
-        e = discord.Embed(title="ðŸ›¡ï¸ Anti-Nuke Status", color=discord.Color.green())
-        e.add_field(name="Enabled", value="âœ… Yes" if c["enabled"] else "âŒ No", inline=True)
+        e = discord.Embed(title="Anti-Nuke Status", color=discord.Color.green())
+        e.add_field(name="Enabled", value="Yes" if c["enabled"] else "No", inline=True)
         e.add_field(name="Threshold", value=str(c["threshold"]), inline=True)
         e.add_field(name="Window", value=f"{c['window']}s", inline=True)
         e.add_field(name="Alert Channel", value=f"<#{c['alert']}>" if c["alert"] else "Not configured", inline=False)
         e.add_field(name="Mode", value=c["mode"], inline=True)
-        e.add_field(name="Auto-Lockdown", value="âœ… Active (triggers on threshold breach)", inline=True)
+        e.add_field(name="Auto-Lockdown", value="Active (triggers on threshold breach)", inline=True)
         await ctx.send(embed=e, ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="enable")
@@ -296,7 +296,7 @@ class AntiNuke(commands.Cog):
             await db.execute("UPDATE antinuke_config SET enabled=1 WHERE guild_id=?", (ctx.guild.id,))
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_enabled", "Anti-Nuke monitoring enabled", ctx.author.id)
-        await ctx.send("âœ… Anti-Nuke **enabled**. Monitoring channel create/delete activity with auto-lockdown.", ephemeral=ctx.interaction is not None)
+        await ctx.send("Anti-Nuke **enabled**. Monitoring channel create/delete activity with auto-lockdown.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="disable")
     @commands.guild_only()
@@ -308,7 +308,7 @@ class AntiNuke(commands.Cog):
             await db.execute("UPDATE antinuke_config SET enabled=0 WHERE guild_id=?", (ctx.guild.id,))
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_disabled", "Anti-Nuke monitoring disabled", ctx.author.id)
-        await ctx.send("âŒ Anti-Nuke **disabled**. No monitoring active.", ephemeral=ctx.interaction is not None)
+        await ctx.send("Anti-Nuke **disabled**. No monitoring active.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="toggle")
     @commands.guild_only()
@@ -322,7 +322,7 @@ class AntiNuke(commands.Cog):
             await db.commit()
         action = "enabled" if new_state else "disabled"
         await add_security_log(ctx.guild.id, f"antinuke_{action}", f"Anti-Nuke {action} via toggle", ctx.author.id)
-        await ctx.send(f"ðŸ”„ Anti-Nuke **{action}**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"Anti-Nuke **{action}**.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="alertchannel")
     @commands.guild_only()
@@ -341,14 +341,14 @@ class AntiNuke(commands.Cog):
             )
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_alertchannel", f"Alert channel set to {channel.id}", ctx.author.id)
-        await ctx.send(f"âœ… Alerts set to {channel.mention}.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"Alerts set to {channel.mention}.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="threshold")
     @commands.guild_only()
     @commands.has_guild_permissions(manage_guild=True)
     async def threshold(self, ctx, count: int, window_seconds: int):
         if not 2 <= count <= 20 or not 3 <= window_seconds <= 60:
-            await ctx.send("Count must be 2â€“20; window 3â€“60 seconds.", ephemeral=ctx.interaction is not None)
+            await ctx.send("Count must be 2-20; window 3-60 seconds.", ephemeral=ctx.interaction is not None)
             return
         await self.config(ctx.guild.id)
         async with aiosqlite.connect(DB_PATH) as db:
@@ -358,7 +358,7 @@ class AntiNuke(commands.Cog):
             )
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_threshold", f"Threshold: {count}/{window_seconds}s", ctx.author.id)
-        await ctx.send(f"âœ… Threshold set to {count} events / {window_seconds}s.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"Threshold set to {count} events / {window_seconds}s.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="whitelist-add")
     @commands.guild_only()
@@ -372,7 +372,7 @@ class AntiNuke(commands.Cog):
             )
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_whitelist_add", f"Added {member.id}", ctx.author.id)
-        await ctx.send(f"âœ… {member.mention} whitelisted.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{member.mention} whitelisted.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="whitelist-remove")
     @commands.guild_only()
@@ -385,7 +385,7 @@ class AntiNuke(commands.Cog):
             )
             await db.commit()
         await add_security_log(ctx.guild.id, "antinuke_whitelist_remove", f"Removed {member.id}", ctx.author.id)
-        await ctx.send(f"âœ… {member.mention} removed from whitelist.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{member.mention} removed from whitelist.", ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="whitelist-list")
     @commands.guild_only()
@@ -399,8 +399,8 @@ class AntiNuke(commands.Cog):
         if not rows:
             await ctx.send("No whitelisted users.", ephemeral=ctx.interaction is not None)
             return
-        desc = "\n".join(f"â€¢ <@{row[0]}> (`{row[0]}`)" for row in rows)
-        e = discord.Embed(title="ðŸ›¡ï¸ Anti-Nuke Whitelist", description=desc, color=discord.Color.blurple())
+        desc = "\n".join(f"- <@{row[0]}> (`{row[0]}`)" for row in rows)
+        e = discord.Embed(title="Anti-Nuke Whitelist", description=desc, color=discord.Color.blurple())
         await ctx.send(embed=e, ephemeral=ctx.interaction is not None)
 
     @antinuke.command(name="incidents")
@@ -408,7 +408,7 @@ class AntiNuke(commands.Cog):
     @commands.has_guild_permissions(manage_guild=True)
     async def incidents(self, ctx, limit: int = 10):
         if not 1 <= limit <= 25:
-            await ctx.send("Limit must be 1â€“25.", ephemeral=ctx.interaction is not None)
+            await ctx.send("Limit must be 1-25.", ephemeral=ctx.interaction is not None)
             return
         async with aiosqlite.connect(DB_PATH) as db:
             cur = await db.execute(
@@ -423,7 +423,7 @@ class AntiNuke(commands.Cog):
         for actor_id, action, count, details, created_at in rows:
             actor = ctx.guild.get_member(actor_id) if actor_id else None
             actor_str = f"{actor.mention} (`{actor_id}`)" if actor else f"Unknown (`{actor_id}`)"
-            lines.append(f"**{created_at}** â€” {actor_str} â€” {action} (Ã—{count}): {details[:100]}")
+            lines.append(f"**{created_at}** - {actor_str} - {action} (x{count}): {details[:100]}")
         await ctx.send("\n".join(lines)[:1900], ephemeral=ctx.interaction is not None)
 
 
