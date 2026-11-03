@@ -10,41 +10,66 @@ log = logging.getLogger("sentinel_guard.setup")
 
 
 ROLE_DEFINITIONS = {
-    "Sentinel Developer": discord.Permissions.none(),
-
-    "Sentinel Owner": discord.Permissions(
-        manage_guild=True,
-        manage_channels=True,
-        manage_roles=True,
-        view_audit_log=True,
-    ),
-
-    "Sentinel Admin": discord.Permissions(
-        manage_messages=True,
-        kick_members=True,
-        ban_members=True,
-        moderate_members=True,
-        view_audit_log=True,
-    ),
-
-    "Sentinel Moderator": discord.Permissions(
-        manage_messages=True,
-        kick_members=True,
-        moderate_members=True,
-        view_audit_log=True,
-    ),
-
-    "Sentinel Trusted": discord.Permissions(
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True,
-    ),
-
-    "Sentinel Member": discord.Permissions(
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True,
-    ),
+    "Sentinel Developer": {
+        "permissions": discord.Permissions.none(),
+        "color": discord.Color.from_rgb(255, 0, 128),  # Hot pink/magenta
+        "hoist": True,
+        "mentionable": True,
+    },
+    "Sentinel Owner": {
+        "permissions": discord.Permissions(
+            manage_guild=True,
+            manage_channels=True,
+            manage_roles=True,
+            view_audit_log=True,
+        ),
+        "color": discord.Color.from_rgb(255, 215, 0),  # Gold
+        "hoist": True,
+        "mentionable": True,
+    },
+    "Sentinel Admin": {
+        "permissions": discord.Permissions(
+            manage_messages=True,
+            kick_members=True,
+            ban_members=True,
+            moderate_members=True,
+            view_audit_log=True,
+        ),
+        "color": discord.Color.from_rgb(255, 69, 0),  # Red-orange
+        "hoist": True,
+        "mentionable": True,
+    },
+    "Sentinel Moderator": {
+        "permissions": discord.Permissions(
+            manage_messages=True,
+            kick_members=True,
+            moderate_members=True,
+            view_audit_log=True,
+        ),
+        "color": discord.Color.from_rgb(0, 191, 255),  # Deep sky blue
+        "hoist": True,
+        "mentionable": True,
+    },
+    "Sentinel Trusted": {
+        "permissions": discord.Permissions(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+        ),
+        "color": discord.Color.from_rgb(50, 205, 50),  # Lime green
+        "hoist": False,
+        "mentionable": False,
+    },
+    "Sentinel Member": {
+        "permissions": discord.Permissions(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+        ),
+        "color": discord.Color.from_rgb(100, 149, 237),  # Cornflower blue
+        "hoist": False,
+        "mentionable": False,
+    },
 }
 
 
@@ -74,8 +99,8 @@ class Setup(commands.Cog):
         status = []
         created_roles = []
 
-        # Create security roles without granting Administrator.
-        for name, permissions in ROLE_DEFINITIONS.items():
+        # Create security roles with colors.
+        for name, config in ROLE_DEFINITIONS.items():
 
             role = discord.utils.get(
                 guild.roles,
@@ -86,25 +111,42 @@ class Setup(commands.Cog):
                 try:
                     await guild.create_role(
                         name=name,
-                        permissions=permissions,
+                        permissions=config["permissions"],
+                        color=config["color"],
+                        hoist=config["hoist"],
+                        mentionable=config["mentionable"],
                         reason="Sentinel Guard security setup",
                     )
 
                     created_roles.append(name)
                     status.append(
-                        f"✅ Created role: **{name}**"
+                        f"âœ… Created role: **{name}**"
                     )
 
                 except discord.HTTPException as exc:
                     status.append(
-                        f"❌ Could not create **{name}**: "
+                        f"âŒ Could not create **{name}**: "
                         f"`{type(exc).__name__}`"
                     )
 
             else:
-                status.append(
-                    f"↪️ Role already exists: **{name}**"
-                )
+                # Update existing role with correct color/permissions/hoist/mentionable
+                try:
+                    await role.edit(
+                        permissions=config["permissions"],
+                        color=config["color"],
+                        hoist=config["hoist"],
+                        mentionable=config["mentionable"],
+                        reason="Sentinel Guard configuration sync",
+                    )
+                    status.append(
+                        f"ðŸ”„ Updated role: **{name}**"
+                    )
+                except discord.HTTPException as exc:
+                    status.append(
+                        f"âš ï¸ Could not update **{name}**: "
+                        f"`{type(exc).__name__}`"
+                    )
 
         # Create security category.
         category = discord.utils.get(
@@ -120,14 +162,14 @@ class Setup(commands.Cog):
                 )
 
                 status.append(
-                    "✅ Created category: **Sentinel Security**"
+                    "âœ… Created category: **Sentinel Security**"
                 )
 
             except discord.HTTPException as exc:
                 category = None
 
                 status.append(
-                    "❌ Category creation failed: "
+                    "âŒ Category creation failed: "
                     f"`{type(exc).__name__}`"
                 )
 
@@ -146,18 +188,18 @@ class Setup(commands.Cog):
                 )
 
                 status.append(
-                    "✅ Created channel: **#sentinel-logs**"
+                    "âœ… Created channel: **#sentinel-logs**"
                 )
 
             except discord.HTTPException as exc:
                 status.append(
-                    "❌ Log channel creation failed: "
+                    "âŒ Log channel creation failed: "
                     f"`{type(exc).__name__}`"
                 )
 
         elif log_channel is not None:
             status.append(
-                "↪️ Log channel already exists: **#sentinel-logs**"
+                "â†ªï¸ Log channel already exists: **#sentinel-logs**"
             )
 
         # Save the log channel in SQLite.
@@ -169,7 +211,7 @@ class Setup(commands.Cog):
                 )
 
                 status.append(
-                    "✅ Log channel saved to database."
+                    "âœ… Log channel saved to database."
                 )
 
             except Exception:
@@ -179,7 +221,7 @@ class Setup(commands.Cog):
                 )
 
                 status.append(
-                    "⚠️ Could not save the log channel to SQLite."
+                    "âš ï¸ Could not save the log channel to SQLite."
                 )
 
         # Record the setup event.
@@ -243,30 +285,76 @@ class Setup(commands.Cog):
 
             except (discord.Forbidden, discord.HTTPException):
                 status.append(
-                    "⚠️ Could not fetch all members. "
+                    "âš ï¸ Could not fetch all members. "
                     "Check Server Members Intent and permissions."
                 )
 
         status.append(
-            f"👥 Members assigned: **{assigned}**\n"
-            f"⏭️ Members skipped: **{skipped}**\n"
-            f"❌ Assignment failures: **{failed}**"
+            f"ðŸ‘¥ Members assigned: **{assigned}**\n"
+            f"â­ï¸ Members skipped: **{skipped}**\n"
+            f"âŒ Assignment failures: **{failed}**"
         )
 
         status.append(
-            "ℹ️ New members can receive Sentinel Member "
+            "â„¹ï¸ New members can receive Sentinel Member "
             "automatically when the bot has the required permissions."
         )
 
         # Send the setup report.
         embed = discord.Embed(
-            title="🛡️ Sentinel Guard Setup Report",
+            title="ðŸ›¡ï¸ Sentinel Guard Setup Report",
             description="\n".join(status)[:4000],
             color=discord.Color.blurple(),
         )
 
         embed.set_footer(
-            text=f"Server: {guild.name} • ID: {guild.id}"
+            text=f"Server: {guild.name} â€¢ ID: {guild.id}"
+        )
+
+        await ctx.send(
+            embed=embed,
+            ephemeral=ctx.interaction is not None,
+        )
+
+    @commands.hybrid_command(
+        name="syncroles",
+        description="Sync Sentinel role colors, permissions, and settings",
+    )
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.bot_has_guild_permissions(manage_roles=True)
+    async def syncroles(self, ctx: commands.Context):
+        """Sync all Sentinel role colors, permissions, hoist, and mentionable settings."""
+        guild = ctx.guild
+
+        if guild is None:
+            return
+
+        status = []
+
+        for name, config in ROLE_DEFINITIONS.items():
+            role = discord.utils.get(guild.roles, name=name)
+
+            if role is None:
+                status.append(f"âŒ Role missing: **{name}** (run `/security_setup` first)")
+                continue
+
+            try:
+                await role.edit(
+                    permissions=config["permissions"],
+                    color=config["color"],
+                    hoist=config["hoist"],
+                    mentionable=config["mentionable"],
+                    reason="Sentinel Guard role sync",
+                )
+                status.append(f"âœ… Synced: **{name}**")
+            except discord.HTTPException as exc:
+                status.append(f"âŒ Failed to sync **{name}**: `{type(exc).__name__}`")
+
+        embed = discord.Embed(
+            title="ðŸŽ¨ Role Sync Report",
+            description="\n".join(status)[:4000],
+            color=discord.Color.blurple(),
         )
 
         await ctx.send(
