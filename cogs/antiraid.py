@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 import discord
 from discord.ext import commands
 from config import DB_PATH
+from core.emojis import e as emoji
 from database.db import get_log_channel, add_security_log
 
 
@@ -90,7 +91,7 @@ class AntiRaid(commands.Cog):
     async def status(self, ctx):
         cfg = await self._get_config(ctx.guild.id)
         e = discord.Embed(title="Anti-Raid Status", color=discord.Color.blue())
-        e.add_field(name="Enabled", value="Yes" if cfg["enabled"] else "No", inline=True)
+        e.add_field(name="Enabled", value=(f"{emoji('enabled')} Yes" if cfg["enabled"] else f"{emoji('disabled')} No"), inline=True)
         e.add_field(name="Threshold", value=f"{cfg['threshold']} joins", inline=True)
         e.add_field(name="Window", value=f"{cfg['window']} seconds", inline=True)
         e.add_field(name="Alert Channel", value=f"<#{cfg['alert']}>" if cfg["alert"] else "Not configured", inline=False)
@@ -103,7 +104,7 @@ class AntiRaid(commands.Cog):
     async def enable(self, ctx):
         await self._set_config(ctx.guild.id, enabled=True)
         await add_security_log(ctx.guild.id, "raidmode_enabled", "AntiRaid monitoring enabled", ctx.author.id)
-        await ctx.send("AntiRaid **enabled**. Monitoring join spikes.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('enabled')} AntiRaid **enabled**. Monitoring join spikes.", ephemeral=ctx.interaction is not None)
 
     @raidmode.command(name="disable")
     @commands.guild_only()
@@ -111,7 +112,7 @@ class AntiRaid(commands.Cog):
     async def disable(self, ctx):
         await self._set_config(ctx.guild.id, enabled=False)
         await add_security_log(ctx.guild.id, "raidmode_disabled", "AntiRaid monitoring disabled", ctx.author.id)
-        await ctx.send("AntiRaid **disabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('disabled')} AntiRaid **disabled**.", ephemeral=ctx.interaction is not None)
 
     @raidmode.command(name="toggle")
     @commands.guild_only()
