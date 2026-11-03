@@ -111,7 +111,23 @@ SCHEMA = [
         reason TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
+    """,
     """
+    CREATE TABLE IF NOT EXISTS automod_config (
+        guild_id INTEGER PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        log_actions INTEGER NOT NULL DEFAULT 1
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS antiraid_config (
+        guild_id INTEGER PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        threshold INTEGER NOT NULL DEFAULT 8,
+        window_seconds INTEGER NOT NULL DEFAULT 20,
+        alert_channel_id INTEGER
+    )
+    """,
 ]
 
 
