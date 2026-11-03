@@ -73,7 +73,7 @@ class AntiRaid(commands.Cog):
             if isinstance(ch, discord.TextChannel):
                 try:
                     await ch.send(
-                        f"ðŸš¨ **Possible raid:** {len(q)} joins within {cfg['window']} seconds. "
+                        f"**Possible raid:** {len(q)} joins within {cfg['window']} seconds. "
                         f"Review new accounts; no automatic punishment applied."
                     )
                 except discord.HTTPException:
@@ -89,8 +89,8 @@ class AntiRaid(commands.Cog):
     @commands.has_guild_permissions(manage_guild=True)
     async def status(self, ctx):
         cfg = await self._get_config(ctx.guild.id)
-        e = discord.Embed(title="ðŸ›¡ï¸ Anti-Raid Status", color=discord.Color.blue())
-        e.add_field(name="Enabled", value="âœ… Yes" if cfg["enabled"] else "âŒ No", inline=True)
+        e = discord.Embed(title="Anti-Raid Status", color=discord.Color.blue())
+        e.add_field(name="Enabled", value="Yes" if cfg["enabled"] else "No", inline=True)
         e.add_field(name="Threshold", value=f"{cfg['threshold']} joins", inline=True)
         e.add_field(name="Window", value=f"{cfg['window']} seconds", inline=True)
         e.add_field(name="Alert Channel", value=f"<#{cfg['alert']}>" if cfg["alert"] else "Not configured", inline=False)
@@ -103,7 +103,7 @@ class AntiRaid(commands.Cog):
     async def enable(self, ctx):
         await self._set_config(ctx.guild.id, enabled=True)
         await add_security_log(ctx.guild.id, "raidmode_enabled", "AntiRaid monitoring enabled", ctx.author.id)
-        await ctx.send("âœ… AntiRaid **enabled**. Monitoring join spikes.", ephemeral=ctx.interaction is not None)
+        await ctx.send("AntiRaid **enabled**. Monitoring join spikes.", ephemeral=ctx.interaction is not None)
 
     @raidmode.command(name="disable")
     @commands.guild_only()
@@ -111,7 +111,7 @@ class AntiRaid(commands.Cog):
     async def disable(self, ctx):
         await self._set_config(ctx.guild.id, enabled=False)
         await add_security_log(ctx.guild.id, "raidmode_disabled", "AntiRaid monitoring disabled", ctx.author.id)
-        await ctx.send("âŒ AntiRaid **disabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send("AntiRaid **disabled**.", ephemeral=ctx.interaction is not None)
 
     @raidmode.command(name="toggle")
     @commands.guild_only()
@@ -122,17 +122,17 @@ class AntiRaid(commands.Cog):
         await self._set_config(ctx.guild.id, enabled=new_state)
         action = "enabled" if new_state else "disabled"
         await add_security_log(ctx.guild.id, f"raidmode_{action}", f"AntiRaid {action} via toggle", ctx.author.id)
-        await ctx.send(f"ðŸ”„ AntiRaid **{action}**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"AntiRaid **{action}**.", ephemeral=ctx.interaction is not None)
 
     @raidmode.command(name="config")
     @commands.guild_only()
     @commands.has_guild_permissions(manage_guild=True)
     async def config_cmd(self, ctx, threshold: int = None, window_seconds: int = None, alert_channel: discord.TextChannel = None):
         if threshold is not None and not 3 <= threshold <= 50:
-            await ctx.send("Threshold must be 3â€“50.", ephemeral=ctx.interaction is not None)
+            await ctx.send("Threshold must be 3-50.", ephemeral=ctx.interaction is not None)
             return
         if window_seconds is not None and not 10 <= window_seconds <= 120:
-            await ctx.send("Window must be 10â€“120 seconds.", ephemeral=ctx.interaction is not None)
+            await ctx.send("Window must be 10-120 seconds.", ephemeral=ctx.interaction is not None)
             return
         if alert_channel is not None:
             p = alert_channel.permissions_for(ctx.guild.me)
@@ -147,7 +147,7 @@ class AntiRaid(commands.Cog):
             alert=alert_channel.id if alert_channel else None,
         )
         await add_security_log(ctx.guild.id, "raidmode_config", f"Config updated: threshold={threshold}, window={window_seconds}, alert={alert_channel.id if alert_channel else 'unchanged'}", ctx.author.id)
-        await ctx.send("âœ… AntiRaid configuration updated.", ephemeral=ctx.interaction is not None)
+        await ctx.send("AntiRaid configuration updated.", ephemeral=ctx.interaction is not None)
 
     # Legacy command alias
     @commands.hybrid_command(name="raidstatus")
@@ -156,9 +156,9 @@ class AntiRaid(commands.Cog):
     async def raidstatus(self, ctx):
         cfg = await self._get_config(ctx.guild.id)
         await ctx.send(
-            f"ðŸ›¡ï¸ Anti-Raid: {'Active' if cfg['enabled'] else 'Disabled'} â€¢ "
-            f"Threshold: {cfg['threshold']} joins / {cfg['window']}s â€¢ "
-            f"Recent: {len(self.joins[ctx.guild.id])} â€¢ "
+            f"Anti-Raid: {'Active' if cfg['enabled'] else 'Disabled'} - "
+            f"Threshold: {cfg['threshold']} joins / {cfg['window']}s - "
+            f"Recent: {len(self.joins[ctx.guild.id])} - "
             f"Alert: <#{cfg['alert']}>" if cfg['alert'] else "No alert channel",
             ephemeral=ctx.interaction is not None,
         )
