@@ -15,6 +15,7 @@ import discord
 from discord.ext import commands
 
 from config import DEVELOPER_ID, DEFAULT_PREFIX
+from core.emojis import component, custom_keys, e, refresh, upload_folder
 from database.db import get_prefix
 
 BLUE = discord.Color.from_rgb(35, 91, 170)
@@ -30,7 +31,7 @@ SUPPORT_URL = "https://discord.gg/YOUR_SUPPORT_INVITE"
 
 PAGES: dict[str, dict] = {
     "Overview": {
-        "emoji": "\U0001F6E1\uFE0F",
+        "emoji": "overview",
         "title": "Sentinel Guard - Security Center",
         "description": (
             "Your central control panel for server protection, moderation and recovery.\n"
@@ -43,13 +44,15 @@ PAGES: dict[str, dict] = {
             ("/autosetup", "Fully automatic one-click server setup.", "Manage Server"),
             ("/securityconfig", "View this server's security configuration.", "Manage Server"),
             ("/setsecuritylogs #channel", "Choose the security log channel.", "Manage Server"),
+            ("/antinuke rejoin on|off", "Send a one-time rejoin invite by DM when a member is unbanned.", "Manage Server"),
+            ("/antinuke features", "List every protection AntiNuke provides.", "Everyone"),
             ("/antinuke status", "View AntiNuke configuration and status.", "Manage Server"),
             ("/automod status", "View AutoMod configuration and status.", "Manage Server"),
             ("/lockdown_status", "Check current lockdown/panic mode status.", "Manage Server"),
         ],
     },
     "Setup & Auto-Setup": {
-        "emoji": "\U000026A1",
+        "emoji": "setup",
         "title": "Setup & Auto-Setup",
         "description": "One-command server security initialization and role synchronization.",
         "commands": [
@@ -62,7 +65,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "AntiNuke": {
-        "emoji": "\U00002622\uFE0F",
+        "emoji": "antinuke",
         "title": "AntiNuke Protection",
         "description": "Configure destructive-action detection, trusted-member controls, and **automatic lockdown on nuke attempts**.",
         "commands": [
@@ -70,6 +73,7 @@ PAGES: dict[str, dict] = {
             ("/antinuke enable", "Enable AntiNuke monitoring (channel create/delete detection).", "Manage Server"),
             ("/antinuke disable", "Disable AntiNuke monitoring completely.", "Manage Server"),
             ("/antinuke toggle", "Quick toggle AntiNuke on/off.", "Manage Server"),
+            ("/antinuke mode <alert|strip|kick|ban>", "Choose what happens to an attacker (default: ban).", "Server Owner / Extra Owner"),
             ("/antinuke threshold <count> <seconds>", "Set event threshold (2-20) and detection window (3-60s).", "Manage Server"),
             ("/antinuke alertchannel #channel", "Set where AntiNuke alerts are sent.", "Manage Server"),
             ("/antinuke whitelist-add @member", "Add a trusted member to the AntiNuke whitelist.", "Manage Server"),
@@ -79,7 +83,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Lockdown / Panic Mode": {
-        "emoji": "\U0001F512",
+        "emoji": "lockdown",
         "title": "Server Lockdown & Panic Mode",
         "description": "Emergency server lockdown - denies @everyone Send Messages in all text channels. **Auto-triggers on nuke detection.**\n\nOnly Server Owner or Extra Owners can use these.",
         "commands": [
@@ -90,7 +94,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "AntiRaid": {
-        "emoji": "\U0001F6A8",
+        "emoji": "antiraid",
         "title": "AntiRaid Monitoring",
         "description": "Monitor join spikes and configure raid protection with enable/disable.",
         "commands": [
@@ -102,7 +106,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "AutoMod": {
-        "emoji": "\U00002699\uFE0F",
+        "emoji": "automod",
         "title": "Automated Moderation",
         "description": "Message flood, mass mentions, suspicious links, invites, and duplicate detection with full config.",
         "commands": [
@@ -114,7 +118,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Moderation": {
-        "emoji": "\U00002696\uFE0F",
+        "emoji": "moderation",
         "title": "Member Moderation",
         "description": "Standard moderation commands. Use responsibly and follow your server's rules.",
         "commands": [
@@ -126,7 +130,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Configuration": {
-        "emoji": "\U0001F527",
+        "emoji": "config",
         "title": "Server Configuration",
         "description": "Manage server-specific prefix and security logging settings.",
         "commands": [
@@ -136,7 +140,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Recovery & Backups": {
-        "emoji": "\U0001F4BE",
+        "emoji": "recovery",
         "title": "Recovery & Backups",
         "description": "Database health checks, SQLite snapshots, and configuration drift detection.",
         "commands": [
@@ -148,7 +152,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Permissions & Whitelist": {
-        "emoji": "\U0001F510",
+        "emoji": "permissions",
         "title": "Permissions & Whitelist",
         "description": "Server Owner only: Extra Owners, AntiNuke whitelist, and granular permissions.",
         "commands": [
@@ -161,7 +165,7 @@ PAGES: dict[str, dict] = {
         ],
     },
     "Developer": {
-        "emoji": "\U0001F451",
+        "emoji": "developer",
         "title": "Developer Operations",
         "description": "Restricted diagnostics and operational commands for the configured developer.",
         "commands": [
@@ -222,7 +226,7 @@ def build_embed(
 
     if page_name == "Overview":
         embed = discord.Embed(
-            title="Sentinel Guard - Security Center",
+            title=f"{e('overview')}  Sentinel Guard - Security Center",
             description=(
                 "A powerful security and administration bot for your server.\n"
                 "Everything you need to protect, moderate and manage your community.\n\n"
@@ -233,8 +237,18 @@ def build_embed(
 
         categories = len(PAGES) - 1  # Exclude Developer from count
         total_commands = sum(len(item["commands"]) for name, item in PAGES.items() if name != "Developer")
+        modules = "\n".join(
+            f"{e(item['emoji'])}  **{name}**"
+            for name, item in PAGES.items()
+            if name not in ("Overview", "Developer")
+        )
         embed.add_field(
-            name="Quick Stats",
+            name=f"{e('quickstart')}  Modules",
+            value=modules[:1024],
+            inline=False,
+        )
+        embed.add_field(
+            name=f"{e('stats')}  Quick Stats",
             value=(
                 f"- **{categories}** Command Categories\n"
                 f"- **{total_commands}** Listed Commands\n"
@@ -244,7 +258,7 @@ def build_embed(
         )
         latency = round(bot.latency * 1000) if bot.latency is not None else "-"
         embed.add_field(
-            name="System Status",
+            name=f"{e('commands')}  System Status",
             value=(
                 f"**Gateway latency:** `{latency} ms`\n"
                 f"**Connected servers:** `{len(bot.guilds):,}`\n"
@@ -267,7 +281,7 @@ def build_embed(
     else:
         color = GOLD if page_name == "Developer" else (RED if page_name == "Lockdown / Panic Mode" else BLUE)
         embed = discord.Embed(
-            title=f"{page['emoji']}  {page['title']}",
+            title=f"{e(page['emoji'])}  {page['title']}",
             description=page["description"],
             color=color,
         )
@@ -300,7 +314,7 @@ class HelpSelect(discord.ui.Select):
                     else PAGES[name]["description"][:100]
                 ),
                 value=name,
-                emoji="\U0001F4D6" if name == "Overview" else PAGES[name]["emoji"],
+                emoji=component("menu" if name == "Overview" else PAGES[name]["emoji"]),
                 default=name == help_view.page_name,
             )
             for name in _visible_pages(help_view.developer_allowed)
@@ -330,6 +344,8 @@ class HelpView(discord.ui.View):
         self.requester_id = requester_id
         self.developer_allowed = bool(DEVELOPER_ID and requester_id == DEVELOPER_ID)
         self.page_name = "Overview"
+        self.home_button.emoji = component("home")
+        self.close_button.emoji = component("close")
         self.add_item(HelpSelect(self))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -360,7 +376,7 @@ class HelpView(discord.ui.View):
             view=self,
         )
 
-    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, emoji="\U0001F3E0", row=1)
+    @discord.ui.button(label="Home", style=discord.ButtonStyle.primary, row=1)
     async def home_button(
         self,
         interaction: discord.Interaction,
@@ -368,7 +384,7 @@ class HelpView(discord.ui.View):
     ) -> None:
         await self.show_page(interaction, "Overview")
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="\U00002716\uFE0F", row=1)
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, row=1)
     async def close_button(
         self,
         interaction: discord.Interaction,
@@ -382,6 +398,42 @@ class HelpView(discord.ui.View):
 class Help(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    async def cog_load(self) -> None:
+        await refresh(self.bot)
+
+    @commands.hybrid_command(
+        name="emojisync",
+        description="Developer: upload assets/emojis/*.png as bot emojis and reload them",
+    )
+    async def emojisync(self, ctx: commands.Context) -> None:
+        if not DEVELOPER_ID or ctx.author.id != DEVELOPER_ID:
+            await ctx.send("Developer-only command.", ephemeral=ctx.interaction is not None)
+            return
+
+        await ctx.defer(ephemeral=ctx.interaction is not None)
+        try:
+            uploaded, skipped, errors = await upload_folder(self.bot)
+        except Exception as exc:
+            await ctx.send(f"Emoji sync failed: `{type(exc).__name__}`", ephemeral=ctx.interaction is not None)
+            return
+
+        wanted = sorted(
+            {item["emoji"] for item in PAGES.values()}
+            | {"menu", "home", "close", "invite", "support", "stats", "commands", "quickstart",
+               "success", "error", "warning", "incident", "loading", "enabled", "disabled",
+               "ban", "logs", "server", "database", "ping"}
+        )
+        have = set(custom_keys())
+        lines = [
+            f"Uploaded: {', '.join(uploaded) or 'none'}",
+            f"Already existed: {', '.join(skipped) or 'none'}",
+            f"Custom emojis active: {', '.join(sorted(have)) or 'none'}",
+            f"Still using default emoji: {', '.join(k for k in wanted if k not in have) or 'none'}",
+        ]
+        if errors:
+            lines.append("Errors: " + "; ".join(errors))
+        await ctx.send("\n".join(lines)[:1900], ephemeral=ctx.interaction is not None)
 
     @commands.hybrid_command(
         name="help",
@@ -415,7 +467,7 @@ class Help(commands.Cog):
                     label="Invite Me",
                     style=discord.ButtonStyle.link,
                     url=invite_url,
-                    emoji="\U0001F916",
+                    emoji=component("invite"),
                     row=2,
                 )
             )
@@ -426,7 +478,7 @@ class Help(commands.Cog):
                     label="Support",
                     style=discord.ButtonStyle.link,
                     url=SUPPORT_URL,
-                    emoji="\U0001F517",
+                    emoji=component("support"),
                     row=2,
                 )
             )
