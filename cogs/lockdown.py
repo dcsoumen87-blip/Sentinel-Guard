@@ -70,7 +70,7 @@ class Lockdown(commands.Cog):
         # Permission check
         if not await self._can_manage_lockdown(guild, interaction.user.id):
             await interaction.response.send_message(
-                "âŒ Only the Server Owner or Extra Owners can manage lockdown.",
+                "Only the Server Owner or Extra Owners can manage lockdown.",
                 ephemeral=True,
             )
             return
@@ -91,7 +91,7 @@ class Lockdown(commands.Cog):
                     guild.id, "lockdown_error", f"{type(exc).__name__}: {exc}", interaction.user.id
                 )
                 await interaction.followup.send(
-                    f"âŒ Lockdown failed: `{type(exc).__name__}`. Check logs.",
+                    f"Lockdown failed: `{type(exc).__name__}`. Check logs.",
                     ephemeral=True,
                 )
 
@@ -131,7 +131,7 @@ class Lockdown(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="ðŸ”’ SERVER LOCKDOWN ENABLED",
+            title="SERVER LOCKDOWN ENABLED",
             description=(
                 f"**Actor:** {actor.mention} (`{actor.id}`)\n"
                 f"**Reason:** {reason}\n"
@@ -141,7 +141,7 @@ class Lockdown(commands.Cog):
             color=discord.Color.red(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.set_footer(text="Panic mode active â€¢ Use /lockdown disable to restore")
+        embed.set_footer(text="Panic mode active - Use /lockdown disable to restore")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -193,7 +193,7 @@ class Lockdown(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="ðŸ”“ SERVER LOCKDOWN DISABLED",
+            title="SERVER LOCKDOWN DISABLED",
             description=(
                 f"**Actor:** {actor.mention} (`{actor.id}`)\n"
                 f"**Reason:** {reason}\n"
@@ -235,11 +235,11 @@ class Lockdown(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="ðŸ”’ Lockdown Status",
+            title="Lockdown Status",
             color=discord.Color.red() if is_locked else discord.Color.green(),
             timestamp=discord.utils.utcnow(),
         )
-        embed.add_field(name="Database State", value="ðŸ”’ Locked" if is_locked else "ðŸ”“ Unlocked", inline=True)
+        embed.add_field(name="Database State", value="Locked" if is_locked else "Unlocked", inline=True)
         embed.add_field(name="Channels with @everyone denied Send Messages", value=str(locked_count), inline=True)
         embed.add_field(name="Total Text Channels", value=str(len(guild.text_channels)), inline=True)
 
@@ -260,6 +260,16 @@ class Lockdown(commands.Cog):
         if guild is None:
             return
 
+        # Same rule as /lockdown: only the Server Owner or Extra Owners.
+        if not await self._can_manage_lockdown(guild, ctx.author.id):
+            await ctx.send(
+                "Only the Server Owner or Extra Owners can manage lockdown.",
+                ephemeral=ctx.interaction is not None,
+            )
+            return
+
+        await ctx.defer(ephemeral=ctx.interaction is not None)
+
         current = await self._get_raid_mode(guild.id)
 
         if state == "toggle":
@@ -272,7 +282,7 @@ class Lockdown(commands.Cog):
             await self._disable_lockdown(guild, ctx.author, "Panic mode via command")
 
         action = "enabled" if state == "enable" else "disabled"
-        await ctx.send(f"ðŸ”’ Lockdown **{action}**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"Lockdown **{action}**.", ephemeral=ctx.interaction is not None)
 
 
 async def setup(bot: commands.Bot):
