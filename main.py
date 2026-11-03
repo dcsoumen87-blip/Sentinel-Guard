@@ -87,6 +87,8 @@ class SentinelGuard(commands.Bot):
             "cogs.dev",
             "cogs.recovery",
             "cogs.permissions",
+            "cogs.lockdown",
+            "cogs.autosetup",  # NEW: One-click auto-setup
         )
 
         for extension in extensions:
