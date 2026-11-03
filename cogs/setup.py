@@ -4,6 +4,7 @@ import logging
 import discord
 from discord.ext import commands
 
+from core.emojis import decorate
 from core.roles import ROLE_DEFINITIONS, arrange_sentinel_roles
 from database.db import set_log_channel, add_security_log
 
@@ -245,7 +246,7 @@ class Setup(commands.Cog):
         # Send the setup report.
         embed = discord.Embed(
             title="Sentinel Guard Setup Report",
-            description="\n".join(status)[:4000],
+            description=decorate(status)[:4000],
             color=discord.Color.blurple(),
         )
 
@@ -300,7 +301,7 @@ class Setup(commands.Cog):
 
         embed = discord.Embed(
             title="Role Sync Report",
-            description="\n".join(status)[:4000],
+            description=decorate(status)[:4000],
             color=discord.Color.blurple(),
         )
 
