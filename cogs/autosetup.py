@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 from config import DB_PATH
+from core.emojis import decorate, e as emoji
 from core.roles import ROLE_DEFINITIONS, arrange_sentinel_roles
 from database.db import add_security_log, set_log_channel
 
@@ -84,6 +85,20 @@ class AutoSetup(commands.Cog):
             else:
                 errors.append(message)
 
+            # 1c. The bot role must be above every role that can be used to nuke
+            me = guild.me
+            if me is not None:
+                above = [
+                    r.name for r in guild.roles
+                    if r > me.top_role and not r.is_default()
+                ]
+                if above:
+                    errors.append(
+                        "Warning: roles above the bot role can nuke without being stopped: "
+                        + ", ".join(above[:5])
+                        + ". Drag the Sentinel bot role to the very top."
+                    )
+
             # 2. Security category
             status.append("\n**Creating security category...**")
             category = discord.utils.get(guild.categories, name="Sentinel Security")
@@ -150,15 +165,15 @@ class AutoSetup(commands.Cog):
                         """
                         INSERT INTO antinuke_config
                             (guild_id, enabled, threshold, window_seconds, alert_channel_id, mode)
-                        VALUES (?, 1, 4, 10, ?, 'alert')
+                        VALUES (?, 1, 3, 10, ?, 'ban')
                         ON CONFLICT(guild_id) DO UPDATE SET
-                            enabled=1, threshold=4, window_seconds=10,
-                            alert_channel_id=excluded.alert_channel_id, mode='alert'
+                            enabled=1, threshold=3, window_seconds=10,
+                            alert_channel_id=excluded.alert_channel_id, mode='ban'
                         """,
                         (guild.id, alert_id),
                     )
                     await db.commit()
-                status.append("AntiNuke enabled (threshold: 4/10s, alerts to #sentinel-logs).")
+                status.append("AntiNuke enabled (4 actions/10s, attacker is banned, alerts to #sentinel-logs).")
             except Exception as exc:
                 errors.append(f"AntiNuke config failed: {type(exc).__name__}")
 
@@ -245,7 +260,7 @@ class AutoSetup(commands.Cog):
                     ("Your server is now protected!" if not errors
                      else "Setup finished with some warnings.")
                     + "\n\n**Completed Steps**\n"
-                    + "\n".join(status)
+                    + decorate(status)
                 )[:4000],
                 color=discord.Color.green() if not errors else discord.Color.orange(),
                 timestamp=discord.utils.utcnow(),
@@ -253,7 +268,7 @@ class AutoSetup(commands.Cog):
             if errors:
                 embed.add_field(
                     name="Warnings / Errors",
-                    value="\n".join(errors)[:1024],
+                    value="\n".join(f"{emoji('error')} {x}" for x in errors)[:1024],
                     inline=False,
                 )
             embed.add_field(
