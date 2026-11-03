@@ -96,7 +96,7 @@ class AutoMod(commands.Cog):
             self.last_warn[key] = now
             try:
                 await message.channel.send(
-                    f"âš ï¸ {message.author.mention}, message removed by AutoMod ({reason.replace('_', ' ')}).",
+                    f"{message.author.mention}, message removed by AutoMod ({reason.replace('_', ' ')}).",
                     delete_after=8,
                     allowed_mentions=discord.AllowedMentions(users=True),
                 )
@@ -113,17 +113,17 @@ class AutoMod(commands.Cog):
     @commands.has_guild_permissions(manage_guild=True)
     async def status(self, ctx):
         cfg = await self._get_config(ctx.guild.id)
-        e = discord.Embed(title="ðŸ›¡ï¸ AutoMod Status", color=discord.Color.blue())
-        e.add_field(name="Enabled", value="âœ… Yes" if cfg["enabled"] else "âŒ No", inline=True)
-        e.add_field(name="Log Actions", value="âœ… Yes" if cfg["log_actions"] else "âŒ No", inline=True)
+        e = discord.Embed(title="AutoMod Status", color=discord.Color.blue())
+        e.add_field(name="Enabled", value="Yes" if cfg["enabled"] else "No", inline=True)
+        e.add_field(name="Log Actions", value="Yes" if cfg["log_actions"] else "No", inline=True)
         e.add_field(
             name="Filters Active",
             value=(
-                "â€¢ Message flood (6 msgs/8s)\n"
-                "â€¢ Mass mentions (@everyone/@here)\n"
-                "â€¢ Suspicious phishing text\n"
-                "â€¢ Discord invites (non-managers)\n"
-                "â€¢ Duplicate messages (3x same)"
+                "- Message flood (6 msgs/8s)\n"
+                "- Mass mentions (@everyone/@here)\n"
+                "- Suspicious phishing text\n"
+                "- Discord invites (non-managers)\n"
+                "- Duplicate messages (3x same)"
             ),
             inline=False,
         )
@@ -136,7 +136,7 @@ class AutoMod(commands.Cog):
         """Enable AutoMod."""
         await self._set_config(ctx.guild.id, enabled=True)
         await add_security_log(ctx.guild.id, "automod_enabled", "AutoMod enabled", ctx.author.id)
-        await ctx.send("âœ… AutoMod **enabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send("AutoMod **enabled**.", ephemeral=ctx.interaction is not None)
 
     @automod.command(name="disable")
     @commands.guild_only()
@@ -145,7 +145,7 @@ class AutoMod(commands.Cog):
         """Disable AutoMod."""
         await self._set_config(ctx.guild.id, enabled=False)
         await add_security_log(ctx.guild.id, "automod_disabled", "AutoMod disabled", ctx.author.id)
-        await ctx.send("âŒ AutoMod **disabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send("AutoMod **disabled**.", ephemeral=ctx.interaction is not None)
 
     @automod.command(name="toggle")
     @commands.guild_only()
@@ -157,7 +157,7 @@ class AutoMod(commands.Cog):
         await self._set_config(ctx.guild.id, enabled=new_state)
         action = "enabled" if new_state else "disabled"
         await add_security_log(ctx.guild.id, f"automod_{action}", f"AutoMod {action} via toggle", ctx.author.id)
-        await ctx.send(f"ðŸ”„ AutoMod **{action}**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"AutoMod **{action}**.", ephemeral=ctx.interaction is not None)
 
     @automod.command(name="logging")
     @commands.guild_only()
@@ -171,7 +171,7 @@ class AutoMod(commands.Cog):
         enabled = state in ("on", "enable", "true", "yes")
         await self._set_config(ctx.guild.id, log_actions=enabled)
         await add_security_log(ctx.guild.id, "automod_logging", f"Logging {'enabled' if enabled else 'disabled'}", ctx.author.id)
-        await ctx.send(f"ðŸ“ AutoMod action logging **{'enabled' if enabled else 'disabled'}**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"AutoMod action logging **{'enabled' if enabled else 'disabled'}**.", ephemeral=ctx.interaction is not None)
 
 
 async def setup(bot):
