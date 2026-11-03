@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 import discord
 from discord.ext import commands
 from config import DB_PATH
+from core.emojis import e as emoji
 from database.db import add_security_log, get_log_channel
 
 INVITE_MARKERS = ("discord.gg/", "discord.com/invite/")
@@ -114,8 +115,8 @@ class AutoMod(commands.Cog):
     async def status(self, ctx):
         cfg = await self._get_config(ctx.guild.id)
         e = discord.Embed(title="AutoMod Status", color=discord.Color.blue())
-        e.add_field(name="Enabled", value="Yes" if cfg["enabled"] else "No", inline=True)
-        e.add_field(name="Log Actions", value="Yes" if cfg["log_actions"] else "No", inline=True)
+        e.add_field(name="Enabled", value=(f"{emoji('enabled')} Yes" if cfg["enabled"] else f"{emoji('disabled')} No"), inline=True)
+        e.add_field(name="Log Actions", value=(f"{emoji('enabled')} Yes" if cfg["log_actions"] else f"{emoji('disabled')} No"), inline=True)
         e.add_field(
             name="Filters Active",
             value=(
@@ -136,7 +137,7 @@ class AutoMod(commands.Cog):
         """Enable AutoMod."""
         await self._set_config(ctx.guild.id, enabled=True)
         await add_security_log(ctx.guild.id, "automod_enabled", "AutoMod enabled", ctx.author.id)
-        await ctx.send("AutoMod **enabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('enabled')} AutoMod **enabled**.", ephemeral=ctx.interaction is not None)
 
     @automod.command(name="disable")
     @commands.guild_only()
@@ -145,7 +146,7 @@ class AutoMod(commands.Cog):
         """Disable AutoMod."""
         await self._set_config(ctx.guild.id, enabled=False)
         await add_security_log(ctx.guild.id, "automod_disabled", "AutoMod disabled", ctx.author.id)
-        await ctx.send("AutoMod **disabled**.", ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('disabled')} AutoMod **disabled**.", ephemeral=ctx.interaction is not None)
 
     @automod.command(name="toggle")
     @commands.guild_only()
