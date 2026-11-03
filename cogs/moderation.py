@@ -1,6 +1,7 @@
 from datetime import timedelta
 import discord
 from discord.ext import commands
+from core.emojis import e as emoji
 from database.db import add_security_log
 
 class Moderation(commands.Cog):
@@ -28,7 +29,7 @@ class Moderation(commands.Cog):
     async def ban(self,ctx,member:discord.Member,*,reason="No reason provided"):
         if not await self.check(ctx,member):return
         await member.ban(reason=reason,delete_message_seconds=0); await add_security_log(ctx.guild.id,"ban",reason,ctx.author.id)
-        await ctx.send(f"🔨 Banned {member.mention}.",ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('ban')} Banned {member.mention}.",ephemeral=ctx.interaction is not None)
     @commands.hybrid_command(name="timeout")
     @commands.guild_only()
     @commands.has_guild_permissions(moderate_members=True)
@@ -58,6 +59,6 @@ class Moderation(commands.Cog):
         from config import DB_PATH
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("INSERT INTO warnings(guild_id,user_id,moderator_id,reason) VALUES(?,?,?,?)",(ctx.guild.id,member.id,ctx.author.id,reason)); await db.commit()
-        await ctx.send(f"⚠️ Warned {member.mention}: {reason}",ephemeral=ctx.interaction is not None)
+        await ctx.send(f"{emoji('warning')} Warned {member.mention}: {reason}",ephemeral=ctx.interaction is not None)
 
 async def setup(bot): await bot.add_cog(Moderation(bot))
