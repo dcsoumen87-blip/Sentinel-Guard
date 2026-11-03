@@ -163,4 +163,3 @@ async def arrange_sentinel_roles(guild: discord.Guild) -> tuple[bool, str]:
             + ". Drag the bot's role above them."
         )
     return True, message
-  
