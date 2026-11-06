@@ -1,4 +1,6 @@
-"""Server Owner, Extra Owner and Whitelist permission management."""
+# cogs/permissions.py
+
+import logging
 
 import discord
 import aiosqlite
@@ -7,7 +9,9 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import DB_PATH
-from core.permissions import is_server_owner, is_extra_owner
+
+from core.permissions import is_server_owner
+
 from core.whitelist_permissions import (
     VALID_PERMISSIONS,
     grant_permission,
@@ -16,15 +20,81 @@ from core.whitelist_permissions import (
 )
 
 
+logger = logging.getLogger("sentinel.permissions")
+
+
 class Permissions(commands.Cog):
-    """Manage server-specific security permissions."""
+    """Server Owner, Extra Owner and Whitelist management."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def can_manage(self, guild: discord.Guild, user_id: int) -> bool:
-        """Only the actual Server Owner can manage these assignments."""
-        return await is_server_owner(guild, user_id)
+    # ========================================================
+    # AUTHORIZATION
+    # ========================================================
+
+    async def can_manage(
+        self,
+        guild: discord.Guild,
+        user_id: int,
+    ) -> bool:
+
+        if guild is None:
+            return False
+
+        try:
+            return await is_server_owner(
+                guild,
+                user_id,
+            )
+
+        except Exception:
+
+            logger.exception(
+                "Authorization verification failed."
+            )
+
+            return False
+
+    # ========================================================
+    # RESPONSE HELPER
+    # ========================================================
+
+    async def respond(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        *,
+        success: bool = True,
+    ):
+
+        embed = discord.Embed(
+            description=message,
+            color=(
+                discord.Color.green()
+                if success
+                else discord.Color.red()
+            ),
+            timestamp=discord.utils.utcnow(),
+        )
+
+        if interaction.response.is_done():
+
+            await interaction.followup.send(
+                embed=embed,
+                ephemeral=True,
+            )
+
+        else:
+
+            await interaction.response.send_message(
+                embed=embed,
+                ephemeral=True,
+            )
+
+    # ========================================================
+    # EXTRA OWNER ADD
+    # ========================================================
 
     @app_commands.command(
         name="extraowner_add",
@@ -36,40 +106,75 @@ class Permissions(commands.Cog):
         interaction: discord.Interaction,
         member: discord.Member,
     ):
+
         guild = interaction.guild
 
-        if guild is None:
-            return
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
 
-        if not await self.can_manage(guild, interaction.user.id):
-            await interaction.response.send_message(
+            await self.respond(
+                interaction,
                 "❌ Only the Server Owner can add Extra Owners.",
-                ephemeral=True,
+                success=False,
             )
             return
 
         if member.id == guild.owner_id or member.bot:
-            await interaction.response.send_message(
+
+            await self.respond(
+                interaction,
                 "❌ This member cannot be assigned as an Extra Owner.",
-                ephemeral=True,
+                success=False,
             )
             return
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                """
-                INSERT OR IGNORE INTO server_extra_owners
-                (guild_id, user_id)
-                VALUES (?, ?)
-                """,
-                (guild.id, member.id),
-            )
-            await db.commit()
+        try:
 
-        await interaction.response.send_message(
-            f"✅ {member.mention} is now an Extra Owner.",
-            ephemeral=True,
-        )
+            async with aiosqlite.connect(DB_PATH) as db:
+
+                cursor = await db.execute(
+                    """
+                    INSERT OR IGNORE INTO server_extra_owners
+                    (guild_id, user_id)
+                    VALUES (?, ?)
+                    """,
+                    (guild.id, member.id),
+                )
+
+                await db.commit()
+
+                added = cursor.rowcount > 0
+
+            if added:
+
+                await self.respond(
+                    interaction,
+                    f"✅ {member.mention} is now an Extra Owner.",
+                )
+
+            else:
+
+                await self.respond(
+                    interaction,
+                    f"ℹ️ {member.mention} is already an Extra Owner.",
+                    success=False,
+                )
+
+        except aiosqlite.Error:
+
+            logger.exception("Extra Owner addition failed.")
+
+            await self.respond(
+                interaction,
+                "❌ Database error while adding Extra Owner.",
+                success=False,
+            )
+
+    # ========================================================
+    # EXTRA OWNER REMOVE
+    # ========================================================
 
     @app_commands.command(
         name="extraowner_remove",
@@ -81,37 +186,66 @@ class Permissions(commands.Cog):
         interaction: discord.Interaction,
         member: discord.Member,
     ):
+
         guild = interaction.guild
 
-        if guild is None:
-            return
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
 
-        if not await self.can_manage(guild, interaction.user.id):
-            await interaction.response.send_message(
+            await self.respond(
+                interaction,
                 "❌ Only the Server Owner can remove Extra Owners.",
-                ephemeral=True,
+                success=False,
             )
             return
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                """
-                DELETE FROM server_extra_owners
-                WHERE guild_id = ? AND user_id = ?
-                """,
-                (guild.id, member.id),
+        try:
+
+            async with aiosqlite.connect(DB_PATH) as db:
+
+                cursor = await db.execute(
+                    """
+                    DELETE FROM server_extra_owners
+                    WHERE guild_id = ?
+                    AND user_id = ?
+                    """,
+                    (guild.id, member.id),
+                )
+
+                await db.commit()
+
+                removed = cursor.rowcount > 0
+
+            if removed:
+
+                await self.respond(
+                    interaction,
+                    f"✅ Removed {member.mention} from Extra Owners.",
+                )
+
+            else:
+
+                await self.respond(
+                    interaction,
+                    "ℹ️ This member is not an Extra Owner.",
+                    success=False,
+                )
+
+        except aiosqlite.Error:
+
+            logger.exception("Extra Owner removal failed.")
+
+            await self.respond(
+                interaction,
+                "❌ Database error while removing Extra Owner.",
+                success=False,
             )
-            await db.commit()
 
-        if cursor.rowcount:
-            message = f"✅ Removed {member.mention} from Extra Owners."
-        else:
-            message = "ℹ️ This member is not an Extra Owner."
-
-        await interaction.response.send_message(
-            message,
-            ephemeral=True,
-        )
+    # ========================================================
+    # EXTRA OWNER LIST
+    # ========================================================
 
     @app_commands.command(
         name="extraowner_list",
@@ -122,47 +256,71 @@ class Permissions(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
+
         guild = interaction.guild
 
-        if guild is None:
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
+
+            await self.respond(
+                interaction,
+                "❌ Only the Server Owner can view this list.",
+                success=False,
+            )
             return
 
-        if not await self.can_manage(guild, interaction.user.id):
+        try:
+
+            async with aiosqlite.connect(DB_PATH) as db:
+
+                cursor = await db.execute(
+                    """
+                    SELECT user_id
+                    FROM server_extra_owners
+                    WHERE guild_id = ?
+                    ORDER BY created_at
+                    """,
+                    (guild.id,),
+                )
+
+                rows = await cursor.fetchall()
+
+            description = (
+                "\n".join(
+                    f"• <@{row[0]}> (`{row[0]}`)"
+                    for row in rows
+                )
+                if rows
+                else "No Extra Owners are configured."
+            )
+
+            embed = discord.Embed(
+                title="👑 Server Extra Owners",
+                description=description,
+                color=discord.Color.gold(),
+                timestamp=discord.utils.utcnow(),
+            )
+
             await interaction.response.send_message(
-                "❌ Only the Server Owner can view this list.",
+                embed=embed,
                 ephemeral=True,
             )
-            return
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                """
-                SELECT user_id FROM server_extra_owners
-                WHERE guild_id = ?
-                ORDER BY created_at
-                """,
-                (guild.id,),
-            )
-            rows = await cursor.fetchall()
+        except aiosqlite.Error:
 
-        if not rows:
-            description = "No Extra Owners are configured."
-        else:
-            description = "\n".join(
-                f"• <@{row[0]}> (`{row[0]}`)"
-                for row in rows
+            logger.exception("Extra Owner listing failed.")
+
+            await self.respond(
+                interaction,
+                "❌ Unable to retrieve Extra Owners.",
+                success=False,
             )
 
-        embed = discord.Embed(
-            title="👑 Server Extra Owners",
-            description=description,
-            color=discord.Color.gold(),
-        )
-
-        await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True,
-        )
+    # ========================================================
+    # WHITELIST ADD
+    # ========================================================
 
     @app_commands.command(
         name="whitelist_add",
@@ -174,40 +332,78 @@ class Permissions(commands.Cog):
         interaction: discord.Interaction,
         member: discord.Member,
     ):
+
         guild = interaction.guild
 
-        if guild is None:
-            return
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
 
-        if not await self.can_manage(guild, interaction.user.id):
-            await interaction.response.send_message(
+            await self.respond(
+                interaction,
                 "❌ Only the Server Owner can manage the whitelist.",
-                ephemeral=True,
+                success=False,
             )
             return
 
         if member.id == guild.owner_id or member.bot:
-            await interaction.response.send_message(
+
+            await self.respond(
+                interaction,
                 "❌ This member cannot be added to the whitelist.",
-                ephemeral=True,
+                success=False,
             )
             return
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                """
-                INSERT OR IGNORE INTO antinuke_whitelist
-                (guild_id, user_id)
-                VALUES (?, ?)
-                """,
-                (guild.id, member.id),
-            )
-            await db.commit()
+        try:
 
-        await interaction.response.send_message(
-            f"✅ Added {member.mention} to the whitelist.",
-            ephemeral=True,
-        )
+            async with aiosqlite.connect(DB_PATH) as db:
+
+                cursor = await db.execute(
+                    """
+                    INSERT OR IGNORE INTO antinuke_whitelist
+                    (guild_id, user_id)
+                    VALUES (?, ?)
+                    """,
+                    (guild.id, member.id),
+                )
+
+                await db.commit()
+
+                added = cursor.rowcount > 0
+
+            if added:
+
+                message = (
+                    f"✅ Added {member.mention} to the whitelist."
+                )
+
+            else:
+
+                message = (
+                    f"ℹ️ {member.mention} is already whitelisted."
+                )
+
+            await self.respond(
+                interaction,
+                message,
+                success=added,
+            )
+
+        except aiosqlite.Error:
+
+            logger.exception("Whitelist addition failed.")
+
+            await self.respond(
+                interaction,
+                "❌ Database error while updating whitelist.",
+                success=False,
+            )
+
+    # ========================================================
+    # WHITELIST REMOVE
+    # ========================================================
 
     @app_commands.command(
         name="whitelist_remove",
@@ -219,43 +415,85 @@ class Permissions(commands.Cog):
         interaction: discord.Interaction,
         member: discord.Member,
     ):
+
         guild = interaction.guild
 
-        if guild is None:
-            return
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
 
-        if not await self.can_manage(guild, interaction.user.id):
-            await interaction.response.send_message(
+            await self.respond(
+                interaction,
                 "❌ Only the Server Owner can manage the whitelist.",
-                ephemeral=True,
+                success=False,
             )
             return
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                """
-                DELETE FROM antinuke_whitelist
-                WHERE guild_id = ? AND user_id = ?
-                """,
-                (guild.id, member.id),
-            )
-            await db.execute(
-                """
-                DELETE FROM whitelist_permissions
-                WHERE guild_id = ? AND user_id = ?
-                """,
-                (guild.id, member.id),
-            )
-            await db.commit()
+        try:
 
-        await interaction.response.send_message(
-            f"✅ Removed {member.mention} and their whitelist permissions.",
-            ephemeral=True,
-        )
+            async with aiosqlite.connect(DB_PATH) as db:
+
+                await db.execute("BEGIN IMMEDIATE")
+
+                cursor = await db.execute(
+                    """
+                    DELETE FROM antinuke_whitelist
+                    WHERE guild_id = ?
+                    AND user_id = ?
+                    """,
+                    (guild.id, member.id),
+                )
+
+                removed = cursor.rowcount > 0
+
+                await db.execute(
+                    """
+                    DELETE FROM whitelist_permissions
+                    WHERE guild_id = ?
+                    AND user_id = ?
+                    """,
+                    (guild.id, member.id),
+                )
+
+                await db.commit()
+
+            if removed:
+
+                message = (
+                    f"✅ Removed {member.mention} and revoked "
+                    "their whitelist permissions."
+                )
+
+            else:
+
+                message = (
+                    "ℹ️ This member is not whitelisted."
+                )
+
+            await self.respond(
+                interaction,
+                message,
+                success=removed,
+            )
+
+        except aiosqlite.Error:
+
+            logger.exception("Whitelist removal failed.")
+
+            await self.respond(
+                interaction,
+                "❌ Database error while removing whitelist entry.",
+                success=False,
+            )
+
+    # ========================================================
+    # WHITELIST PERMISSION
+    # ========================================================
 
     @app_commands.command(
         name="whitelist_permission",
-        description="Grant or revoke a specific whitelist permission.",
+        description="Manage specific whitelist permissions.",
     )
     @app_commands.guild_only()
     @app_commands.choices(
@@ -265,11 +503,26 @@ class Permissions(commands.Cog):
             app_commands.Choice(name="Check", value="check"),
         ],
         permission=[
-            app_commands.Choice(name="Create Channels", value="channel_create"),
-            app_commands.Choice(name="Delete Channels", value="channel_delete"),
-            app_commands.Choice(name="Kick Members", value="member_kick"),
-            app_commands.Choice(name="Ban Members", value="member_ban"),
-            app_commands.Choice(name="Grant Administrator", value="admin_grant"),
+            app_commands.Choice(
+                name="Create Channels",
+                value="channel_create",
+            ),
+            app_commands.Choice(
+                name="Delete Channels",
+                value="channel_delete",
+            ),
+            app_commands.Choice(
+                name="Kick Members",
+                value="member_kick",
+            ),
+            app_commands.Choice(
+                name="Ban Members",
+                value="member_ban",
+            ),
+            app_commands.Choice(
+                name="Grant Administrator",
+                value="admin_grant",
+            ),
         ],
     )
     async def whitelist_permission(
@@ -279,60 +532,122 @@ class Permissions(commands.Cog):
         action: app_commands.Choice[str],
         permission: app_commands.Choice[str],
     ):
+
         guild = interaction.guild
 
-        if guild is None:
-            return
+        if not await self.can_manage(
+            guild,
+            interaction.user.id,
+        ):
 
-        if not await self.can_manage(guild, interaction.user.id):
-            await interaction.response.send_message(
+            await self.respond(
+                interaction,
                 "❌ Only the Server Owner can change whitelist permissions.",
-                ephemeral=True,
+                success=False,
             )
             return
 
         if permission.value not in VALID_PERMISSIONS:
-            await interaction.response.send_message(
-                "❌ Invalid permission.",
-                ephemeral=True,
+
+            await self.respond(
+                interaction,
+                "❌ Invalid permission selected.",
+                success=False,
             )
             return
 
-        if action.value == "grant":
-            success = await grant_permission(
-                guild.id, member.id, permission.value
+        if member.bot or member.id == guild.owner_id:
+
+            await self.respond(
+                interaction,
+                "❌ This member cannot receive whitelist permissions.",
+                success=False,
             )
-            result = (
-                f"✅ Granted `{permission.value}` to {member.mention}."
-                if success
-                else "❌ Add this member to the whitelist first."
+            return
+
+        try:
+
+            if action.value == "grant":
+
+                success = await grant_permission(
+                    guild.id,
+                    member.id,
+                    permission.value,
+                )
+
+                if success:
+
+                    result = (
+                        f"✅ Granted `{permission.value}` "
+                        f"to {member.mention}."
+                    )
+
+                else:
+
+                    result = (
+                        "❌ Add this member to the whitelist first."
+                    )
+
+            elif action.value == "revoke":
+
+                success = await revoke_permission(
+                    guild.id,
+                    member.id,
+                    permission.value,
+                )
+
+                result = (
+                    f"✅ Revoked `{permission.value}` "
+                    f"from {member.mention}."
+                    if success
+                    else "ℹ️ This permission was not assigned."
+                )
+
+            elif action.value == "check":
+
+                success = await has_permission(
+                    guild.id,
+                    member.id,
+                    permission.value,
+                )
+
+                result = (
+                    f"✅ {member.mention} has `{permission.value}`."
+                    if success
+                    else f"❌ {member.mention} does not have "
+                         f"`{permission.value}`."
+                )
+
+            else:
+
+                await self.respond(
+                    interaction,
+                    "❌ Invalid action.",
+                    success=False,
+                )
+                return
+
+            await self.respond(
+                interaction,
+                result,
+                success=success,
             )
 
-        elif action.value == "revoke":
-            success = await revoke_permission(
-                guild.id, member.id, permission.value
-            )
-            result = (
-                f"✅ Revoked `{permission.value}` from {member.mention}."
-                if success
-                else "ℹ️ This permission was not assigned."
+        except (aiosqlite.Error, ValueError):
+
+            logger.exception(
+                "Whitelist permission operation failed."
             )
 
-        else:
-            success = await has_permission(
-                guild.id, member.id, permission.value
+            await self.respond(
+                interaction,
+                "❌ Unable to process whitelist permission.",
+                success=False,
             )
-            result = (
-                f"✅ {member.mention} has `{permission.value}`."
-                if success
-                else f"❌ {member.mention} does not have `{permission.value}`."
-            )
-
-        await interaction.response.send_message(
-            result,
-            ephemeral=True,
-        )
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Permissions(bot))
+
+    await bot.add_cog(
+        Permissions(bot)
+    )
